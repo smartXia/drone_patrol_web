@@ -1,0 +1,142 @@
+/* 引入CSS变量 */
+@import './variables.css';
+
+/* 全局样式重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-color-page);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* 通用工具类 */
+.text-center {
+  text-align: center;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.mt-10 {
+  margin-top: 10px;
+}
+
+.mt-15 {
+  margin-top: 15px;
+}
+
+.mt-20 {
+  margin-top: 20px;
+}
+
+.mb-10 {
+  margin-bottom: 10px;
+}
+
+.mb-15 {
+  margin-bottom: 15px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.ml-10 {
+  margin-left: 10px;
+}
+
+.mr-10 {
+  margin-right: 10px;
+}
+
+.p-10 {
+  padding: 10px;
+}
+
+.p-15 {
+  padding: 15px;
+}
+
+.p-20 {
+  padding: 20px;
+}
+
+ /* 响应式布局 */
+ @media (max-width: 768px) {
+   .dashboard-layout {
+     flex-direction: column;
+   }
+   
+   .topic-sidebar {
+     width: 100%;
+     margin-bottom: 20px;
+   }
+   
+   .connection-controls {
+     flex-wrap: wrap;
+   }
+   
+   .device-grid {
+     grid-template-columns: 1fr;
+   }
+   
+   .topic-messages-container {
+     grid-template-columns: 1fr;
+   }
+   
+   .topic-message-card {
+     min-height: 300px;
+   }
+   
+   .topic-messages {
+     height: 200px;
+   }
+ }
+
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 10px;
+  }
+  
+  .connection-controls {
+    flex-direction: column;
+  }
+  
+  .connection-controls .el-button {
+    width: 100%;
+  }
+}

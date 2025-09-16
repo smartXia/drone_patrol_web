@@ -1,0 +1,82 @@
+{
+  "name": "drone-patrol-web",
+  "version": "1.0.0",
+  "description": "大疆无人机设备实时状态监控系统",
+  "author": "DJI Solutions <support@example.com>",
+  "license": "MIT",
+  "main": "electron/main.js",
+  "homepage": "./",
+  "scripts": {
+    "dev": "vite",
+    "dev:web": "vite",
+    "dev:api": "node server/redis.js",
+    "dev:mqtt": "node server/mqtt.js",
+    "dev:all": "concurrently \"npm:dev:api\" \"npm:dev:web\"",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
+    "desktop": "node desktop-server.js",
+    "start": "npm run build && npm run desktop",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "electron": "electron .",
+    "electron:dev": "cross-env NODE_ENV=development electron .",
+    "electron:build": "npm run build && electron-builder",
+    "electron:dist": "npm run build && electron-builder --publish=never",
+    "electron:pack": "npm run build && electron-builder --dir"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.9",
+    "echarts": "^5.4.3",
+    "element-plus": "^2.3.8",
+    "express": "^5.1.0",
+    "ioredis": "^5.7.0",
+    "lowdb": "^7.0.1",
+    "mqtt": "^5.0.5",
+    "nanoid": "^5.1.5",
+    "pinia": "^2.1.6",
+    "redis": "^5.8.2",
+    "vue": "^3.3.4",
+    "vue-echarts": "^6.6.1",
+    "vue-router": "^4.2.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.2.3",
+    "@vue/eslint-config-prettier": "^8.0.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4",
+    "eslint": "^8.45.0",
+    "eslint-plugin-vue": "^9.15.1",
+    "prettier": "^3.0.0",
+    "vite": "^4.4.5"
+  },
+  "build": {
+    "appId": "com.dji.drone-patrol-web",
+    "productName": "大疆无人机监控系统",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "asar": true,
+    "win": {
+      "target": "nsis",
+      "icon": "src-tauri/icons/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "大疆无人机监控系统"
+    }
+  }
+}

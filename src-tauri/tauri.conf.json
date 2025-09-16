@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "大疆无人机监控系统",
+  "version": "1.0.0",
+  "identifier": "com.dji.drone-patrol-web",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "大疆无人机监控系统",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1200,
+        "minHeight": 800,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "DJI",
+    "copyright": "Copyright © 2024 DJI. All rights reserved.",
+    "category": "Utility",
+    "shortDescription": "大疆无人机设备实时状态监控系统",
+    "longDescription": "基于Vue.js和MQTT的大疆无人机设备实时状态监控系统，支持设备状态监控、消息订阅、错误码查询等功能。"
+  }
+}

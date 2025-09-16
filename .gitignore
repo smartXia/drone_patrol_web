@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+/dist/
+/dist-electron/
+/src-tauri/target/
+
+# Local runtime data (sensitive)
+/server/data/
+
+# Environment configs
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+yarn-error.log
+npm-debug.log*
+
+# OS/Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.venv/
+
+# Package manager lock (prefer yarn)
+package-lock.json
+

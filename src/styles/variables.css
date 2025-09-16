@@ -1,0 +1,97 @@
+/* CSS变量定义 */
+:root {
+  /* 主色调 */
+  --primary-color: #409eff;
+  --primary-light: #79bbff;
+  --primary-dark: #337ecc;
+  
+  /* 成功色 */
+  --success-color: #67c23a;
+  --success-light: #95d475;
+  --success-dark: #529b2e;
+  
+  /* 警告色 */
+  --warning-color: #e6a23c;
+  --warning-light: #ebb563;
+  --warning-dark: #b88230;
+  
+  /* 危险色 */
+  --danger-color: #f56c6c;
+  --danger-light: #f78989;
+  --danger-dark: #c45656;
+  
+  /* 信息色 */
+  --info-color: #909399;
+  --info-light: #b1b3b8;
+  --info-dark: #73767a;
+  
+  /* 文字颜色 */
+  --text-primary: #303133;
+  --text-regular: #606266;
+  --text-secondary: #909399;
+  --text-placeholder: #c0c4cc;
+  
+  /* 边框颜色 */
+  --border-color: #dcdfe6;
+  --border-light: #e4e7ed;
+  --border-lighter: #ebeef5;
+  --border-extra-light: #f2f6fc;
+  
+  /* 背景颜色 */
+  --bg-color: #ffffff;
+  --bg-color-page: #f2f3f5;
+  --bg-color-overlay: #ffffff;
+  
+  /* 阴影 */
+  --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 0 6px rgba(0, 0, 0, 0.04);
+  --box-shadow-light: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  --box-shadow-dark: 0 2px 4px rgba(0, 0, 0, 0.12), 0 0 6px rgba(0, 0, 0, 0.12);
+  
+  /* 圆角 */
+  --border-radius-base: 4px;
+  --border-radius-small: 2px;
+  --border-radius-round: 20px;
+  --border-radius-circle: 100%;
+  
+  /* 字体大小 */
+  --font-size-extra-large: 26px;
+  --font-size-large: 24px;
+  --font-size-medium: 22px;
+  --font-size-base: 20px;
+  --font-size-small: 18px;
+  --font-size-extra-small: 16px;
+  
+  /* 间距 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-xxl: 24px;
+  
+  /* 布局 */
+  --header-height: 60px;
+  --sidebar-width: 200px;
+  --content-padding: 20px;
+  
+  /* 动画 */
+  --transition-duration: 0.3s;
+  --transition-timing: cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+/* 深色主题变量 */
+[data-theme="dark"] {
+  --text-primary: #e5eaf3;
+  --text-regular: #cfd3dc;
+  --text-secondary: #a3a6ad;
+  --text-placeholder: #8d9095;
+  
+  --border-color: #4c4d4f;
+  --border-light: #414243;
+  --border-lighter: #363637;
+  --border-extra-light: #2b2b2c;
+  
+  --bg-color: #141414;
+  --bg-color-page: #0a0a0a;
+  --bg-color-overlay: #1d1e1f;
+}
