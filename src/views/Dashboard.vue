@@ -108,6 +108,7 @@
          </el-button>
          <el-button @click="openConnMgr">连接管理</el-button>
          <el-button @click="gotoRedis">Redis 连接</el-button>
+         <el-button type="info" @click="runDiagnostics">网络诊断</el-button>
        </div>
        
                 <div class="topic-input" style="margin-top: 15px;">
@@ -521,7 +522,6 @@ import { FullScreen } from '@element-plus/icons-vue'
 import '@/styles/dashboard.css'
 import ConnectionManager from '../components/mqtt/ConnectionManager.vue'
 import { useRouter, useRoute } from 'vue-router'
-import { onMounted } from 'vue'
 
  const mqttStore = useMqttStore()
  const messageDetailVisible = ref(false)
@@ -1245,6 +1245,44 @@ const closeErrorDoc = () => {
 }
 
 const openConnMgr = () => { connMgrRef.value && connMgrRef.value.open() }
+
+// 网络诊断功能
+const runDiagnostics = async () => {
+  if (!mqttStore.currentConfig) {
+    ElMessage.warning('请先配置MQTT连接信息')
+    return
+  }
+
+  const config = mqttStore.currentConfig
+  ElMessage.info('开始网络诊断...')
+  
+  try {
+    // 检查网络连通性
+    console.log('开始网络连通性检查...', { host: config.host, port: config.port })
+    const networkResult = await mqttStore.checkNetworkConnectivity(config.host, config.port)
+    console.log('网络连通性检查结果:', networkResult)
+    
+    if (networkResult.success) {
+      ElMessage.success(`网络连通性检查通过 - ${config.host}:${config.port} (耗时: ${networkResult.duration}ms)`)
+    } else {
+      ElMessage.error(`网络连通性检查失败 - ${networkResult.error || '未知错误'}`)
+    }
+    
+    // 测试MQTT连接
+    try {
+      console.log('开始MQTT连接测试...', config)
+      await mqttStore.testConnection({ config })
+      ElMessage.success('MQTT连接测试通过')
+    } catch (mqttError) {
+      console.error('MQTT连接测试失败:', mqttError)
+      ElMessage.error(`MQTT连接测试失败 - ${mqttError.message}`)
+    }
+    
+  } catch (error) {
+    console.error('诊断过程中出现错误:', error)
+    ElMessage.error(`诊断过程中出现错误: ${error.message}`)
+  }
+}
 
 // 组件挂载时自动连接
 onMounted(() => {

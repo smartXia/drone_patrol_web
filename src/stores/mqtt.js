@@ -19,7 +19,7 @@ export const useMqttStore = defineStore('mqtt', () => {
   const currentProfileId = ref(null)
 
   // 后端本地服务地址
-  const apiBase = import.meta.env?.VITE_MQTT_API_BASE || 'http://127.0.0.1:7077'
+  const apiBase = import.meta.env?.VITE_MQTT_API_BASE || 'http://127.0.0.1:8080'
 
   // 计算属性
   const connectionStatus = computed(() => {
@@ -70,6 +70,15 @@ export const useMqttStore = defineStore('mqtt', () => {
       }
       
       console.log('正在连接MQTT:', url)
+      console.log('连接配置:', {
+        host: cfg.host,
+        port: cfg.port,
+        protocol: cfg.protocol,
+        path: cfg.path,
+        username: cfg.username ? '***' : '未设置',
+        clientId: options.clientId
+      })
+      
       client.value = mqtt.connect(url, options)
 
             client.value.on('connect', () => {
@@ -88,9 +97,29 @@ export const useMqttStore = defineStore('mqtt', () => {
         console.error('错误详情:', {
           message: error.message,
           code: error.code,
-          stack: error.stack
+          stack: error.stack,
+          url: url,
+          config: {
+            host: cfg.host,
+            port: cfg.port,
+            protocol: cfg.protocol,
+            path: cfg.path
+          }
         })
-        connectionError.value = error.message
+        
+        // 提供更友好的错误信息
+        let errorMessage = error.message
+        if (error.code === 'ECONNREFUSED') {
+          errorMessage = `连接被拒绝 - 请检查服务器地址 ${cfg.host}:${cfg.port} 是否正确，以及服务器是否运行`
+        } else if (error.code === 'ENOTFOUND') {
+          errorMessage = `无法解析主机名 ${cfg.host} - 请检查网络连接和DNS设置`
+        } else if (error.message.includes('WebSocket connection failed')) {
+          errorMessage = `WebSocket连接失败 - 请检查服务器是否支持WebSocket协议，或尝试使用TCP协议`
+        } else if (error.message.includes('timeout')) {
+          errorMessage = `连接超时 - 请检查网络连接和防火墙设置`
+        }
+        
+        connectionError.value = errorMessage
         isConnected.value = false
         isConnecting.value = false
       })
@@ -199,6 +228,40 @@ export const useMqttStore = defineStore('mqtt', () => {
     const { data } = await axios.post(`${apiBase}/api/mqtt/test`, payload)
     if (data && data.code === 0) return true
     throw new Error(data?.message || '测试连接失败')
+  }
+
+  // 检查网络连通性
+  const checkNetworkConnectivity = async (host, port) => {
+    try {
+      const response = await axios.get(`${apiBase}/api/network/ping`, {
+        params: { host, port },
+        timeout: 5000
+      })
+      
+      // 转换后端API返回的数据格式
+      const { code, data, message } = response.data
+      if (code === 0) {
+        return {
+          success: data.success,
+          duration: data.duration,
+          host: data.host,
+          port: data.port
+        }
+      } else {
+        return {
+          success: false,
+          error: message || '网络检查失败',
+          duration: data?.duration || 0
+        }
+      }
+    } catch (error) {
+      console.error('网络连通性检查失败:', error)
+      return { 
+        success: false, 
+        error: error.response?.data?.message || error.message || '网络检查失败',
+        duration: 0
+      }
+    }
   }
 
   // 订阅主题
@@ -370,6 +433,7 @@ export const useMqttStore = defineStore('mqtt', () => {
     setDefaultProfile,
     selectProfile,
     setConfig,
-    testConnection
+    testConnection,
+    checkNetworkConnectivity
   }
 })

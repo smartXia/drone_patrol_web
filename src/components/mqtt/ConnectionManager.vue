@@ -8,9 +8,19 @@
       <div class="left">
         <el-form :model="form" label-width="120px">
           <el-form-item label="协议">
-            <el-select v-model="form.protocol" placeholder="选择协议" style="width: 100%">
-              <el-option label="ws" value="ws" />
-              <el-option label="wss" value="wss" />
+            <el-select v-model="form.protocol" placeholder="选择协议" style="width: 100%" @change="onProtocolChange">
+              <el-option label="TCP (推荐)" value="tcp">
+                <span>TCP</span>
+                <span style="float: right; color: #8492a6; font-size: 12px;">原生MQTT协议，性能最佳</span>
+              </el-option>
+              <el-option label="WebSocket" value="ws">
+                <span>WebSocket</span>
+                <span style="float: right; color: #8492a6; font-size: 12px;">适用于浏览器环境</span>
+              </el-option>
+              <el-option label="WebSocket Secure" value="wss">
+                <span>WebSocket Secure</span>
+                <span style="float: right; color: #8492a6; font-size: 12px;">加密WebSocket连接</span>
+              </el-option>
             </el-select>
           </el-form-item>
           <el-form-item label="主机">
@@ -19,8 +29,12 @@
           <el-form-item label="端口">
             <el-input-number v-model="form.port" :min="1" :max="65535" />
           </el-form-item>
-          <el-form-item label="路径">
+          <el-form-item label="路径" v-if="form.protocol !== 'tcp'">
             <el-input v-model="form.path" placeholder="/mqtt" />
+            <div class="form-tip">WebSocket协议需要指定路径，通常为 /mqtt</div>
+          </el-form-item>
+          <el-form-item v-if="form.protocol === 'tcp'">
+            <div class="form-tip">TCP协议使用原生MQTT连接，无需路径配置</div>
           </el-form-item>
           <el-form-item label="用户名">
             <el-input v-model="form.username" />
@@ -66,7 +80,7 @@
           <el-table-column prop="name" label="名称" width="200" />
           <el-table-column label="目标">
             <template #default="{ row }">
-              {{ row.config.protocol }}://{{ row.config.host }}:{{ row.config.port }}{{ row.config.path || '/mqtt' }}
+              {{ row.config.protocol }}://{{ row.config.host }}:{{ row.config.port }}{{ row.config.protocol === 'tcp' ? '' : (row.config.path || '/mqtt') }}
             </template>
           </el-table-column>
           <el-table-column label="默认" width="80">
@@ -99,7 +113,7 @@ const profileName = ref('默认配置')
 const isDefault = ref(false)
 
 const form = reactive({
-  protocol: 'ws',
+  protocol: 'tcp',
   host: '',
   port: undefined,
   path: '/mqtt',
@@ -115,6 +129,20 @@ const form = reactive({
 
 function open() {
   visible.value = true
+}
+
+// 协议切换时的智能默认值设置
+function onProtocolChange(protocol) {
+  if (protocol === 'tcp') {
+    form.path = ''
+    form.port = form.port || 1883
+  } else if (protocol === 'ws') {
+    form.path = form.path || '/mqtt'
+    form.port = form.port || 1883
+  } else if (protocol === 'wss') {
+    form.path = form.path || '/mqtt'
+    form.port = form.port || 8883
+  }
 }
 
 defineExpose({ open })
@@ -214,6 +242,12 @@ async function remove(id) {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 </style>
 
