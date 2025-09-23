@@ -1,22 +1,23 @@
- <template>
-   <div class="dashboard">
-     <div class="dashboard-layout">
-       <!-- 左侧主题列表 -->
-       <div class="topic-sidebar">
-         <el-card class="topic-list-card" shadow="hover">
-           <template #header>
-             <div class="card-header">
-               <span>DJI主题列表</span>
-               <el-button 
-                 type="text" 
-                 size="small" 
-                 @click="resetTopicOrder"
-                 style="margin-left: auto;"
-               >
-                 重置排序
-               </el-button>
-             </div>
-           </template>
+<template>
+  <div class="dashboard">
+    <el-container style="height: 100vh;">
+      <!-- 左侧面板 -->
+      <el-aside :width="sidebarCollapsed ? '0px' : '350px'" class="dashboard-aside" :class="{ 'collapsed': sidebarCollapsed }">
+        <div class="sidebar-content" v-show="!sidebarCollapsed">
+          <!-- 主题列表 -->
+          <el-card class="topic-list-card" shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <span>DJI主题列表</span>
+                <el-button 
+                  type="text" 
+                  size="small" 
+                  @click="resetTopicOrder"
+                >
+                  重置排序
+                </el-button>
+              </div>
+            </template>
            
                      <div class="topic-categories" ref="topicCategoriesRef">
             <!-- 动态渲染主题分类 -->
@@ -37,7 +38,16 @@
                 <el-icon class="drag-handle"><Rank /></el-icon>
               </div>
               <div class="topic-item" v-for="(topic, index) in category.data" :key="`${category.key}-${index}`">
-                <div class="topic-info">
+                <el-button 
+                  type="primary" 
+                  size="small"
+                  :disabled="!mqttProxyStore.isConnected || subscribedTopics.includes(topic.topic)"
+                  @click="subscribeTopic(topic.topic)"
+                  style="margin-right: 12px; flex-shrink: 0;"
+                >
+                  {{ subscribedTopics.includes(topic.topic) ? '已订阅' : '订阅' }}
+                </el-button>
+                <div class="topic-info" style="flex: 1;">
                   <div class="topic-name">{{ topic.name }}</div>
                   <div class="topic-path">{{ formatTopicPath(topic.topic) }}</div>
                   <el-tooltip 
@@ -49,19 +59,11 @@
                     <div class="topic-desc">{{ topic.description }}</div>
                   </el-tooltip>
                 </div>
-                <el-button 
-                  type="primary" 
-                  size="small"
-                  :disabled="!mqttStore.isConnected || subscribedTopics.includes(topic.topic)"
-                  @click="subscribeTopic(topic.topic)"
-                >
-                  {{ subscribedTopics.includes(topic.topic) ? '已订阅' : '订阅' }}
-                </el-button>
               </div>
             </div>
           </div>
-         </el-card>
-       </div>
+          </el-card>
+        </div>
        
        <!-- 右侧主要内容区域 -->
        <div class="main-content">
@@ -77,8 +79,8 @@
              <div class="connection-controls">
          <el-button 
            type="primary" 
-           :loading="mqttStore.isConnecting"
-           :disabled="mqttStore.isConnected"
+           :loading="mqttProxyStore.isConnecting"
+           :disabled="mqttProxyStore.isConnected"
            @click="handleConnect"
          >
            连接MQTT
@@ -86,7 +88,7 @@
          
                    <el-button 
             type="success" 
-            :disabled="!mqttStore.isConnected"
+            :disabled="!mqttProxyStore.isConnected"
             @click="handleSubscribe"
           >
             订阅主题
@@ -94,7 +96,7 @@
          
          <el-button 
            type="danger" 
-           :disabled="!mqttStore.isConnected"
+           :disabled="!mqttProxyStore.isConnected"
            @click="handleDisconnect"
          >
            断开连接
@@ -107,7 +109,6 @@
            清空历史
          </el-button>
          <el-button @click="openConnMgr">连接管理</el-button>
-         <el-button @click="gotoRedis">Redis 连接</el-button>
          <el-button type="info" @click="runDiagnostics">网络诊断</el-button>
        </div>
        
@@ -123,10 +124,10 @@
       
                       <div class="status-display" style="margin-top: 15px;">
            <el-tag 
-             :type="mqttStore.isConnected ? 'success' : 'info'"
+             :type="mqttProxyStore.isConnected ? 'success' : 'info'"
              style="margin-right: 10px;"
            >
-             MQTT状态: {{ mqttStore.isConnected ? '已连接' : '未连接' }}
+             MQTT状态: {{ mqttProxyStore.isConnected ? '已连接' : '未连接' }}
            </el-tag>
            
                        <el-tag 
@@ -149,7 +150,7 @@
                @close="removeTopic(index)"
                style="margin-right: 8px; margin-bottom: 5px;"
              >
-               {{ topic }}
+               {{ topic }} (QoS {{ getTopicQos(topic) }})
              </el-tag>
            </div>
            <!-- 每个订阅主题的独立卡片 -->
@@ -164,6 +165,9 @@
                <template #header>
                  <div class="card-header" style="display:flex; align-items:center; gap:8px; width:100%;">
                    <span style="font-weight:600;">{{ topic }}</span>
+                   <el-tag type="primary" size="small">
+                     QoS {{ getTopicQos(topic) }}
+                   </el-tag>
                    <el-tag v-if="isRecording(topic)" :type="getFilteredTopicMessages(topic).length > 0 ? 'success' : 'info'" size="small">
                      {{ getFilteredTopicMessages(topic).length }} 条
                    </el-tag>
@@ -196,45 +200,81 @@
              </el-card>
            </div>
          </div>
-       
-       <div v-if="mqttStore.connectionError" class="error-message">
-         <el-alert 
-           :title="mqttStore.connectionError" 
-           type="error" 
-           show-icon 
-           :closable="false"
-         />
+         </el-card>
        </div>
-    </el-card>
+      </el-aside>
 
-    <!-- 设备状态展示区域 -->
-    <div class="device-grid">
+      <!-- 主内容区域 -->
+      <el-container>
+        <el-header class="dashboard-header">
+          <div class="header-left">
+            <el-button 
+              :icon="sidebarCollapsed ? 'Expand' : 'Fold'" 
+              @click="toggleSidebar"
+              class="collapse-btn"
+              circle
+              size="small"
+            />
+            <h2>设备监控面板</h2>
+          </div>
+          <div class="header-right">
+            <el-button type="success" @click="toggleConnectionManager">
+              <el-icon><Setting /></el-icon>
+              MQTT 连接管理
+            </el-button>
+            <el-button type="info" @click="runDiagnostics">网络诊断</el-button>
+            <el-button type="primary" @click="openMessageDetail">消息详情</el-button>
+          </div>
+        </el-header>
+
+        <el-main class="dashboard-main">
+          <div v-if="mqttProxyStore.connectionError" class="error-message">
+            <el-alert 
+              :title="mqttProxyStore.connectionError" 
+              type="error" 
+              show-icon 
+              :closable="false"
+            />
+          </div>
+
+          <!-- 主要内容区域：设备监控 + 错误码查询 -->
+          <div class="main-content">
+            <!-- 设备状态展示区域 -->
+            <div class="device-section">
+              <div class="device-grid">
       <el-card 
-        v-for="(device, deviceId) in mqttStore.deviceStatus" 
-        :key="deviceId"
-        class="device-card"
+        v-for="[topic, topicInfo] in allDisplayTopics" 
+        :key="topic"
+        class="device-card clickable-card"
         shadow="hover"
-        v-if="shouldShowDeviceCard(device)"
+        @click="openTopicDialog(topic)"
       >
         <template #header>
           <div class="device-header">
-            <span class="device-id">设备ID: {{ deviceId }}</span>
+            <span class="device-id">主题: {{ topic }}</span>
             <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
-              <el-tag :type="getDeviceStatusType(device)" size="small">{{ getDeviceStatusText(device) }}</el-tag>
-              <el-button circle size="small" @click="openDeviceCardFull(deviceId)"><el-icon><FullScreen /></el-icon></el-button>
+              <el-tag type="primary" size="small">QoS {{ topicInfo.qos }}</el-tag>
+              <el-tag :type="topicInfo.hasData ? 'success' : 'info'" size="small">
+                {{ topicInfo.hasData ? '有数据' : '等待数据' }}
+              </el-tag>
+              <el-button circle size="small" @click.stop="openDeviceCardFull(topic)"><el-icon><FullScreen /></el-icon></el-button>
             </div>
           </div>
         </template>
         
         <div class="device-content">
           <div class="device-info">
-            <p><strong>最后更新:</strong> {{ formatTime(device.lastUpdate) }}</p>
-            <p><strong>主题:</strong> {{ device.topic }}</p>
+            <p><strong>最后更新:</strong> {{ formatTime(topicInfo.timestamp) }}</p>
+            <p><strong>状态:</strong> {{ topicInfo.hasData ? '已收到数据' : '等待数据' }}</p>
           </div>
           
-          <div class="device-data">
+          <div class="device-data" v-if="topicInfo.hasData && topicInfo.device">
             <h4>设备数据:</h4>
-            <pre>{{ JSON.stringify(device, null, 2) }}</pre>
+            <pre>{{ JSON.stringify(topicInfo.device, null, 2) }}</pre>
+          </div>
+          <div class="device-data" v-else>
+            <h4>等待数据中...</h4>
+            <p style="color: #909399;">该主题已订阅，等待接收消息</p>
           </div>
         </div>
       </el-card>
@@ -248,19 +288,209 @@
           连接MQTT获取数据
         </el-button>
       </el-empty>
-    </div>
+              </div>
+            </div>
 
-                   <!-- 主题消息对话框 -->
+            <!-- 错误码查询面板 -->
+            <div class="error-codes-section">
+              <el-card class="error-codes-card" shadow="hover">
+                <template #header>
+                  <div class="card-header">
+                    <span>DJI 错误码查询</span>
+                  </div>
+                </template>
+                
+                <div class="error-codes-content">
+                  <!-- 数据源切换 -->
+                  <div class="source-tabs">
+                    <el-radio-group v-model="errorCodeSource" @change="handleSourceChange">
+                      <el-radio-button label="all">全部</el-radio-button>
+                      <el-radio-button label="dji">DJI错误码</el-radio-button>
+                      <el-radio-button label="hms">HMS错误码</el-radio-button>
+                    </el-radio-group>
+                    <el-button 
+                      type="primary" 
+                      size="small" 
+                      @click="openErrorCodePage"
+                      style="margin-left: 12px;"
+                    >
+                      查看全部
+                    </el-button>
+                  </div>
+                  
+                  <!-- DJI 错误码搜索 -->
+                  <div v-if="errorCodeSource === 'all' || errorCodeSource === 'dji'" class="search-section">
+                    <h4>DJI 错误码</h4>
+                    <el-input
+                      v-model="djiSearchQuery"
+                      placeholder="搜索DJI错误码或描述..."
+                      clearable
+                      @input="handleDjiSearch"
+                      class="search-input"
+                    >
+                      <template #prefix>
+                        <el-icon><Search /></el-icon>
+                      </template>
+                    </el-input>
+                    
+                    <div class="error-codes-list" v-if="filteredDjiCodes.length > 0">
+                      <div 
+                        v-for="errorCode in filteredDjiCodes.slice(0, 5)" 
+                        :key="errorCode.code"
+                        class="error-code-item"
+                        @click="showErrorCodeDetail(errorCode)"
+                      >
+                        <div class="error-code-header">
+                          <span class="error-code">{{ errorCode.code }}</span>
+                          <el-tag :type="getErrorCodeType(errorCode.level)" size="small">
+                            {{ errorCode.level }}
+                          </el-tag>
+                        </div>
+                        <div class="error-description">{{ errorCode.description }}</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- HMS 错误码搜索 -->
+                  <div v-if="errorCodeSource === 'all' || errorCodeSource === 'hms'" class="search-section">
+                    <h4>HMS 错误码</h4>
+                    <el-input
+                      v-model="hmsSearchQuery"
+                      placeholder="搜索HMS错误码或描述..."
+                      clearable
+                      @input="handleHmsSearch"
+                      class="search-input"
+                    >
+                      <template #prefix>
+                        <el-icon><Search /></el-icon>
+                      </template>
+                    </el-input>
+                    
+                    <div class="error-codes-list" v-if="filteredHmsCodes.length > 0">
+                      <div 
+                        v-for="errorCode in filteredHmsCodes.slice(0, 5)" 
+                        :key="errorCode.code"
+                        class="error-code-item"
+                        @click="showHmsErrorDetail(errorCode)"
+                      >
+                        <div class="error-code-header">
+                          <span class="error-code">{{ errorCode.code }}</span>
+                          <el-tag type="info" size="small">HMS</el-tag>
+                        </div>
+                        <div class="error-description">{{ errorCode.zh || '无中文描述' }}</div>
+                        <div class="error-description-en" v-if="errorCode.en">{{ errorCode.en }}</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <el-empty v-if="!hasSearchResults" description="请选择数据源并输入搜索关键词" :image-size="60" />
+                </div>
+              </el-card>
+            </div>
+          </div>
+
+          <!-- 主题消息对话框 -->
           <div class="topic-messages-container">
             <!-- 删除下方重复的已订阅主题列表，保留为空容器以便未来扩展 -->
           </div>
+        </el-main>
+      </el-container>
+    </el-container>
 
-         <!-- 消息详情对话框 -->
-           <el-dialog 
-        v-model="messageDetailVisible" 
-        title="消息详情" 
-        width="60%"
-      >
+    <!-- MQTT 连接管理抽屉 -->
+    <ConnectionManager ref="connMgrRef" :drawer-mode="true" />
+
+    <!-- 错误码详情页面对话框 -->
+    <el-dialog
+      v-model="errorCodePageVisible"
+      title="错误码查询 - 完整列表"
+      width="90%"
+      :before-close="handleCloseErrorCodePage"
+      class="error-code-page-dialog"
+    >
+      <div class="error-code-page">
+        <!-- 页面头部搜索 -->
+        <div class="page-header">
+          <div class="search-controls">
+            <el-input
+              v-model="pageSearchQuery"
+              placeholder="搜索所有错误码..."
+              clearable
+              @input="handlePageSearch"
+              class="page-search-input"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-select
+              v-model="pageDataSource"
+              placeholder="选择数据源"
+              @change="handlePageDataSourceChange"
+              style="width: 150px; margin-left: 12px;"
+            >
+              <el-option label="全部" value="all" />
+              <el-option label="DJI错误码" value="dji" />
+              <el-option label="HMS错误码" value="hms" />
+            </el-select>
+          </div>
+          <div class="page-stats">
+            <el-tag type="info">DJI: {{ djiCodes.length }}</el-tag>
+            <el-tag type="success" style="margin-left: 8px;">HMS: {{ hmsCodes.length }}</el-tag>
+            <el-tag type="warning" style="margin-left: 8px;">显示: {{ pageFilteredCodes.length }}</el-tag>
+          </div>
+        </div>
+
+        <!-- 错误码列表 -->
+        <div class="error-codes-page-list">
+          <div 
+            v-for="errorCode in paginatedCodes" 
+            :key="errorCode.id"
+            class="error-code-page-item"
+            @click="showErrorCodePageDetail(errorCode)"
+          >
+            <div class="error-code-page-header">
+              <span class="error-code-page-code">{{ errorCode.code }}</span>
+              <div class="error-code-page-tags">
+                <el-tag :type="errorCode.type === 'dji' ? getErrorCodeType(errorCode.level) : 'info'" size="small">
+                  {{ errorCode.type === 'dji' ? errorCode.level : 'HMS' }}
+                </el-tag>
+                <el-tag :type="errorCode.type === 'dji' ? 'primary' : 'success'" size="small" style="margin-left: 4px;">
+                  {{ errorCode.type === 'dji' ? 'DJI' : 'HMS' }}
+                </el-tag>
+              </div>
+            </div>
+            <div class="error-code-page-content">
+              <div v-if="errorCode.type === 'dji'" class="error-code-page-description">
+                {{ errorCode.description }}
+              </div>
+              <div v-else class="error-code-page-description">
+                <div class="error-code-page-zh">{{ errorCode.zh }}</div>
+                <div class="error-code-page-en" v-if="errorCode.en">{{ errorCode.en }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 分页 -->
+        <div class="pagination-container" v-if="pageFilteredCodes.length > pageSize">
+          <el-pagination
+            v-model:current-page="currentPage"
+            :page-size="pageSize"
+            :total="pageFilteredCodes.length"
+            layout="prev, pager, next, total"
+            @current-change="handlePageChange"
+          />
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- 消息详情对话框 -->
+    <el-dialog 
+      v-model="messageDetailVisible" 
+      title="消息详情" 
+      width="60%"
+    >
         <div v-if="selectedMessage" class="message-detail">
           <div class="detail-section">
             <h4>基本信息</h4>
@@ -323,7 +553,7 @@
      <!-- 聊天式主题消息对话框 -->
      <el-dialog 
        v-model="topicDialogVisible" 
-       :title="activeTopicDialog + ' - 消息对话'" 
+       :title="activeTopicDialog + ' (QoS ' + getTopicQos(activeTopicDialog) + ') - 消息对话'" 
        width="90%"
        :before-close="closeTopicDialog"
        class="chat-dialog"
@@ -333,6 +563,9 @@
          <div class="chat-header">
            <div class="chat-topic-info">
              <el-tag type="primary" size="large">{{ activeTopicDialog }}</el-tag>
+             <el-tag type="warning" size="large" style="margin-left: 10px;">
+               QoS {{ getTopicQos(activeTopicDialog) }}
+             </el-tag>
              <el-tag 
                :type="getFilteredTopicMessages(activeTopicDialog).length > 0 ? 'success' : 'info'"
                size="large"
@@ -432,6 +665,13 @@
                       >
                         {{ getMessageDirectionText(message) }}
                       </el-tag>
+                      <el-tag 
+                        type="info" 
+                        size="small"
+                        style="margin-right: 8px;"
+                      >
+                        QoS {{ message.qos || 0 }}
+                      </el-tag>
                       <span class="message-time">{{ formatTime(message.timestamp) }}</span>
                     </div>
                   </div>
@@ -467,21 +707,18 @@
          <div class="chat-footer">
            <div class="chat-status">
              <el-tag 
-               :type="mqttStore.isConnected ? 'success' : 'danger'"
+               :type="mqttProxyStore.isConnected ? 'success' : 'danger'"
                size="small"
              >
-               {{ mqttStore.isConnected ? '已连接' : '未连接' }}
+               {{ mqttProxyStore.isConnected ? '已连接' : '未连接' }}
              </el-tag>
              <span class="status-text">
-               {{ mqttStore.isConnected ? '正在监听消息...' : '连接已断开' }}
+               {{ mqttProxyStore.isConnected ? '正在监听消息...' : '连接已断开' }}
              </span>
            </div>
          </div>
        </div>
      </el-dialog>
-       </div>
-     </div>
-   </div>
    
    <!-- 错误码文档抽屉（移入模板内部） -->
    <el-drawer 
@@ -509,25 +746,118 @@
        </el-tab-pane>
      </el-tabs>
    </el-drawer>
-   <ConnectionManager ref="connMgrRef" />
+  </div>
  </template>
 
  <script setup>
- import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
+ import { ref, onMounted, onUnmounted, nextTick, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useMqttStore } from '@/stores/mqtt'
+import { useMqttProxyStore } from '@/stores/mqtt-proxy'
 import dayjs from 'dayjs'
-import { Rank, ArrowUp, ArrowDown } from '@element-plus/icons-vue'
+import { Rank, ArrowUp, ArrowDown, ArrowRight, Setting, Search } from '@element-plus/icons-vue'
 import { FullScreen } from '@element-plus/icons-vue'
 import '@/styles/dashboard.css'
 import ConnectionManager from '../components/mqtt/ConnectionManager.vue'
 import { useRouter, useRoute } from 'vue-router'
 
- const mqttStore = useMqttStore()
+ const mqttProxyStore = useMqttProxyStore()
+ 
+// 侧边栏折叠状态
+const sidebarCollapsed = ref(false)
+ 
  const messageDetailVisible = ref(false)
  const selectedMessage = ref(null)
  const topicInput = ref('thing/product/8UUXN2B00A00ST/events')
- const subscribedTopics = ref([]) // 已订阅的主题列表
+ 
+// 错误码查询相关
+const errorCodeSearchQuery = ref('')
+const errorCodes = ref([])
+const filteredErrorCodes = ref([])
+const errorCodeSource = ref('all') // 'all', 'dji', 'hms'
+
+// DJI 错误码
+const djiSearchQuery = ref('')
+const djiCodes = ref([])
+const filteredDjiCodes = ref([])
+
+// HMS 错误码
+const hmsSearchQuery = ref('')
+const hmsCodes = ref([])
+const filteredHmsCodes = ref([])
+
+// 错误码详情页面相关
+const errorCodePageVisible = ref(false)
+const pageSearchQuery = ref('')
+const pageDataSource = ref('all')
+const pageFilteredCodes = ref([])
+const currentPage = ref(1)
+const pageSize = ref(50)
+
+// 计算属性：是否有搜索结果
+const hasSearchResults = computed(() => {
+  if (errorCodeSource.value === 'all') {
+    return filteredDjiCodes.value.length > 0 || filteredHmsCodes.value.length > 0
+  } else if (errorCodeSource.value === 'dji') {
+    return filteredDjiCodes.value.length > 0
+  } else if (errorCodeSource.value === 'hms') {
+    return filteredHmsCodes.value.length > 0
+  }
+  return false
+})
+
+// 分页数据
+const paginatedCodes = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return pageFilteredCodes.value.slice(start, end)
+})
+ // 使用 store 中的 subscribedTopics，转换为数组格式
+const subscribedTopics = computed(() => {
+  const topics = Array.from(mqttProxyStore.subscribedTopics.keys())
+  console.log('已订阅主题列表:', topics)
+  console.log('Store中的subscribedTopics:', mqttProxyStore.subscribedTopics)
+  return topics
+})
+
+// 获取主题的 QoS 信息
+const getTopicQos = (topic) => {
+  const topicInfo = mqttProxyStore.subscribedTopics.get(topic)
+  return topicInfo ? topicInfo.qos : 0
+}
+
+// 获取所有需要显示的主题（包括已订阅但还没有消息的主题）
+const allDisplayTopics = computed(() => {
+  const topics = new Map()
+  
+  // 添加所有已订阅的主题
+  subscribedTopics.value.forEach(topic => {
+    const topicInfo = mqttProxyStore.subscribedTopics.get(topic)
+    topics.set(topic, {
+      topic,
+      qos: topicInfo ? topicInfo.qos : 0,
+      timestamp: topicInfo ? topicInfo.timestamp : new Date().toISOString(),
+      hasData: false
+    })
+  })
+  
+  // 添加有设备状态的主题
+  Object.entries(mqttProxyStore.deviceStatus).forEach(([deviceId, device]) => {
+    if (device.topic) {
+      const topicInfo = mqttProxyStore.subscribedTopics.get(device.topic)
+      topics.set(device.topic, {
+        topic: device.topic,
+        qos: topicInfo ? topicInfo.qos : 0,
+        timestamp: device.lastUpdate || new Date().toISOString(),
+        hasData: true,
+        deviceId,
+        device
+      })
+    }
+  })
+  
+  return topics
+})
+
  const topicDialogVisible = ref(false) // 主题消息对话框显示状态
  const activeTopicDialog = ref('') // 当前激活的主题对话框
  const chatMessagesRef = ref(null) // 聊天消息区域引用
@@ -536,6 +866,19 @@ import { useRouter, useRoute } from 'vue-router'
  const router = useRouter()
  const route = useRoute()
  const gotoRedis = () => { router.push({ name: 'RedisExplorer' }) }
+
+// 切换侧边栏折叠状态
+const toggleSidebar = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
+// 打开连接管理器抽屉
+const toggleConnectionManager = () => {
+  if (connMgrRef.value) {
+    connMgrRef.value.open()
+  }
+}
+
 
  onMounted(() => {
    if (route.query && (route.query.openMqtt === '1' || route.query.openMqtt === 1)) {
@@ -674,6 +1017,15 @@ import { useRouter, useRoute } from 'vue-router'
 // 记录开关：哪些主题开启了消息记录
 const recordingTopics = ref(new Set())
 
+// 监听订阅主题变化，自动开启记录
+watch(subscribedTopics, (newTopics) => {
+  newTopics.forEach(topic => {
+    if (!recordingTopics.value.has(topic)) {
+      recordingTopics.value.add(topic)
+    }
+  })
+}, { immediate: true })
+
 // 每个主题的搜索关键字
 const topicSearch = ref({})
 
@@ -724,7 +1076,7 @@ const toggleRecording = (topic) => {
 // 连接MQTT
 const handleConnect = async () => {
   try {
-    await mqttStore.connect()
+    await mqttProxyStore.connect()
     ElMessage.success('MQTT连接成功')
   } catch (error) {
     ElMessage.error(`连接失败: ${error.message}`)
@@ -741,15 +1093,21 @@ const handleConnect = async () => {
             }
             if (subscribedTopics.value.includes(topic)) {
               ElMessage.info('该主题已订阅')
+              // 如果已订阅，直接打开对话框
+              openTopicDialog(topic)
               topicInput.value = ''
               return
             }
             
-            await mqttStore.subscribeToTopics(topic)
-            subscribedTopics.value.push(topic)
+            await mqttProxyStore.subscribeToTopics(topic)
             recordingTopics.value.add(topic)
             topicInput.value = '' // 清空输入框
             ElMessage.success(`成功订阅主题: ${topic}`)
+            
+            // 订阅成功后自动打开对话框
+            setTimeout(() => {
+              openTopicDialog(topic)
+            }, 500) // 延迟500ms确保订阅完成
           } catch (error) {
             ElMessage.error(`订阅失败: ${error.message}`)
           }
@@ -757,8 +1115,7 @@ const handleConnect = async () => {
 
                // 断开连接
         const handleDisconnect = () => {
-          mqttStore.disconnect()
-          subscribedTopics.value = []
+          mqttProxyStore.disconnect()
           ElMessage.info('MQTT连接已断开')
         }
         
@@ -766,12 +1123,11 @@ const handleConnect = async () => {
          const removeTopic = async (index) => {
            const topic = subscribedTopics.value[index]
            try {
-             await mqttStore.unsubscribeTopics(topic)
+             await mqttProxyStore.unsubscribeTopics(topic)
+             ElMessage.info(`已移除主题: ${topic}`)
            } catch (e) {
              console.error('取消订阅失败:', e)
            }
-           subscribedTopics.value.splice(index, 1)
-           ElMessage.info(`已移除主题: ${topic}`)
          }
          
                    // 订阅指定主题
@@ -782,23 +1138,28 @@ const handleConnect = async () => {
                 .replace(/\{device_sn\}/g, '8UUXN2B00A00ST')
                 .replace(/\{gateway_sn\}/g, '8UUXN2B00A00ST')
               
+              console.log('点击订阅主题:', topic)
+              console.log('当前已订阅主题:', subscribedTopics.value)
+              
               if (subscribedTopics.value.includes(topic)) {
                 ElMessage.warning('该主题已订阅')
                 return
               }
               
-              await mqttStore.subscribeToTopics(topic)
-              subscribedTopics.value.push(topic)
-              recordingTopics.value.add(topic)
+              console.log('开始订阅主题:', topic)
+              await mqttProxyStore.subscribeToTopics(topic)
+              console.log('订阅请求已发送:', topic)
+              // 不在这里添加 recordingTopics，等待后端确认
               ElMessage.success(`成功订阅主题: ${topic}`)
             } catch (error) {
+              console.error('订阅失败:', error)
               ElMessage.error(`订阅失败: ${error.message}`)
             }
           }
 
 // 清空历史记录
 const clearHistory = () => {
-  mqttStore.clearMessageHistory()
+  mqttProxyStore.clearMessageHistory()
   ElMessage.success('历史记录已清空')
 }
 
@@ -839,10 +1200,13 @@ const getDeviceStatusText = (device) => {
    messageDetailVisible.value = true
  }
  
- // 获取指定主题的消息
- const getTopicMessages = (topic) => {
-   return mqttStore.messageHistory.filter(message => message.topic === topic)
- }
+// 获取指定主题的消息
+const getTopicMessages = (topic) => {
+  const messages = mqttProxyStore.messageHistory.filter(message => message.topic === topic)
+  console.log(`主题 ${topic} 的消息数量:`, messages.length)
+  console.log('所有消息历史:', mqttProxyStore.messageHistory.length)
+  return messages
+}
  
  // 获取指定主题的消息数量
  const getTopicMessageCount = (topic) => {
@@ -890,7 +1254,7 @@ const getDeviceStatusText = (device) => {
  // 清空指定主题的消息
  const clearTopicMessages = (topic) => {
    // 从消息历史中移除指定主题的消息
-   mqttStore.messageHistory = mqttStore.messageHistory.filter(
+   mqttProxyStore.messageHistory = mqttProxyStore.messageHistory.filter(
      message => message.topic !== topic
    )
    ElMessage.success(`已清空主题 ${topic} 的消息`)
@@ -1155,22 +1519,23 @@ const getDeviceStatusText = (device) => {
    }
  }
 
- // 仅展示特定主题来源的设备卡片
+ // 展示设备卡片的条件
 const shouldShowDeviceCard = (device) => {
   if (!device || !device.topic) return false
   const t = device.topic
-  // 仅显示 osd/state/sys 状态等，不显示 events/requests/drc/property 等
-  if (t.includes('/osd')) return true
-  if (t.includes('/state')) return true
-  if (t.startsWith('sys/')) return true
-  return false
+  
+  // 如果主题在已订阅列表中，则显示
+  if (subscribedTopics.value.includes(t)) {
+    return true
+  }
+  
+  // 显示所有有消息的主题（无论是否订阅）
+  return true
 }
 
 // 获取可见设备卡片数量
 const getVisibleDeviceCount = () => {
-  const all = mqttStore.deviceStatus
-  if (!all) return 0
-  return Object.values(all).filter(d => shouldShowDeviceCard(d)).length
+  return allDisplayTopics.value.size
 }
 
 const enlargedTopicVisible = ref(false)
@@ -1240,26 +1605,293 @@ const openErrorDoc = () => {
   errorDocTab.value = 'dji'
   errorDocVisible.value = true
 }
+
+// 错误码查询方法
+const loadErrorCodes = async () => {
+  // 加载 DJI 错误码
+  await loadDjiErrorCodes()
+  // 加载 HMS 错误码
+  await loadHmsErrorCodes()
+}
+
+// 加载 DJI 错误码
+const loadDjiErrorCodes = async () => {
+  try {
+    const response = await fetch('/docs/dji-error-codes.md')
+    const text = await response.text()
+    // 解析制表符分隔的错误码格式
+    const lines = text.split('\n')
+    const codes = []
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim()
+      if (line && !line.includes('错误码') && !line.includes('错误码描述')) {
+        // 使用制表符或空格分割
+        const parts = line.split(/\t|\s{2,}/).filter(p => p.trim())
+        if (parts.length >= 2) {
+          const code = parts[0].trim()
+          const description = parts[1].trim()
+          
+          // 根据错误码范围判断级别
+          let level = 'INFO'
+          const codeNum = parseInt(code)
+          if (codeNum >= 312000 && codeNum < 313000) {
+            level = 'WARN'
+          } else if (codeNum >= 314000) {
+            level = 'ERROR'
+          }
+          
+          codes.push({
+            code: code,
+            level: level,
+            description: description
+          })
+        }
+      }
+    }
+    
+    console.log('加载的DJI错误码数量:', codes.length)
+    djiCodes.value = codes
+    filteredDjiCodes.value = codes
+  } catch (error) {
+    console.error('加载DJI错误码失败:', error)
+    // 使用示例数据
+    djiCodes.value = [
+      { code: '312014', level: 'WARN', description: '设备升级中，请勿重复操作' },
+      { code: '312015', level: 'WARN', description: '机场业务繁忙无法进行设备升级' },
+      { code: '314000', level: 'ERROR', description: '设备当前无法支持该操作' }
+    ]
+    filteredDjiCodes.value = djiCodes.value
+  }
+}
+
+// 加载 HMS 错误码
+const loadHmsErrorCodes = async () => {
+  try {
+    const response = await fetch('/docs/hms.json')
+    const data = await response.json()
+    const codes = []
+    
+    for (const [key, value] of Object.entries(data)) {
+      // 从 key 中提取错误码
+      const codeMatch = key.match(/0x[0-9a-fA-F]+/)
+      if (codeMatch && value) {
+        codes.push({
+          code: codeMatch[0],
+          key: key,
+          zh: value.zh || '',
+          en: value.en || ''
+        })
+      }
+    }
+    
+    console.log('加载的HMS错误码数量:', codes.length)
+    console.log('HMS错误码示例:', codes.slice(0, 3))
+    hmsCodes.value = codes
+    filteredHmsCodes.value = codes
+  } catch (error) {
+    console.error('加载HMS错误码失败:', error)
+    // 使用示例数据
+    hmsCodes.value = [
+      { code: '0x12040000', key: 'dock_tip_0x12040000', zh: '机场RTK设备断连', en: 'Dock RTK device disconnected' },
+      { code: '0x12040001', key: 'dock_tip_0x12040001', zh: '机场位置被移动', en: 'Dock moved' }
+    ]
+    filteredHmsCodes.value = hmsCodes.value
+  }
+}
+
+// DJI 错误码搜索
+const handleDjiSearch = () => {
+  const query = djiSearchQuery.value.toLowerCase()
+  console.log('DJI搜索查询:', query)
+  
+  if (!query) {
+    filteredDjiCodes.value = djiCodes.value
+    return
+  }
+  
+  const filtered = djiCodes.value.filter(code => {
+    const codeMatch = code.code.toLowerCase().includes(query)
+    const descMatch = code.description.toLowerCase().includes(query)
+    const levelMatch = code.level.toLowerCase().includes(query)
+    
+    return codeMatch || descMatch || levelMatch
+  })
+  
+  console.log('DJI搜索结果数量:', filtered.length)
+  filteredDjiCodes.value = filtered
+}
+
+// HMS 错误码搜索
+const handleHmsSearch = () => {
+  const query = hmsSearchQuery.value.toLowerCase()
+  console.log('HMS搜索查询:', query)
+  console.log('HMS总错误码数量:', hmsCodes.value.length)
+  
+  if (!query) {
+    filteredHmsCodes.value = hmsCodes.value
+    console.log('清空HMS搜索，显示所有错误码')
+    return
+  }
+  
+  const filtered = hmsCodes.value.filter(code => {
+    const codeMatch = code.code && code.code.toLowerCase().includes(query)
+    const zhMatch = code.zh && code.zh.toLowerCase().includes(query)
+    const enMatch = code.en && code.en.toLowerCase().includes(query)
+    
+    if (codeMatch || zhMatch || enMatch) {
+      console.log('HMS匹配到错误码:', code)
+    }
+    
+    return codeMatch || zhMatch || enMatch
+  })
+  
+  console.log('HMS搜索结果数量:', filtered.length)
+  console.log('HMS搜索结果:', filtered.slice(0, 3))
+  filteredHmsCodes.value = filtered
+}
+
+// 数据源切换处理
+const handleSourceChange = () => {
+  console.log('切换到数据源:', errorCodeSource.value)
+  // 清空搜索框
+  djiSearchQuery.value = ''
+  hmsSearchQuery.value = ''
+  // 重置搜索结果
+  filteredDjiCodes.value = djiCodes.value
+  filteredHmsCodes.value = hmsCodes.value
+}
+
+const getErrorCodeType = (level) => {
+  switch (level) {
+    case 'ERROR': return 'danger'
+    case 'WARN': return 'warning'
+    case 'INFO': return 'success'
+    default: return 'info'
+  }
+}
+
+const showErrorCodeDetail = (errorCode) => {
+  ElMessage({
+    message: `错误码: ${errorCode.code}\n级别: ${errorCode.level}\n描述: ${errorCode.description}`,
+    type: 'info',
+    duration: 5000,
+    showClose: true
+  })
+}
+
+const showHmsErrorDetail = (errorCode) => {
+  const zhText = errorCode.zh || '无中文描述'
+  const enText = errorCode.en || '无英文描述'
+  ElMessage({
+    message: `错误码: ${errorCode.code}\n中文: ${zhText}\n英文: ${enText}`,
+    type: 'info',
+    duration: 5000,
+    showClose: true
+  })
+}
+
+// 错误码详情页面相关方法
+const openErrorCodePage = () => {
+  errorCodePageVisible.value = true
+  pageSearchQuery.value = ''
+  pageDataSource.value = 'all'
+  currentPage.value = 1
+  updatePageFilteredCodes()
+}
+
+const handleCloseErrorCodePage = () => {
+  errorCodePageVisible.value = false
+}
+
+const updatePageFilteredCodes = () => {
+  let allCodes = []
+  
+  // 合并所有错误码
+  if (pageDataSource.value === 'all' || pageDataSource.value === 'dji') {
+    const djiCodesWithType = djiCodes.value.map(code => ({
+      ...code,
+      type: 'dji',
+      id: `dji_${code.code}`
+    }))
+    allCodes = allCodes.concat(djiCodesWithType)
+  }
+  
+  if (pageDataSource.value === 'all' || pageDataSource.value === 'hms') {
+    const hmsCodesWithType = hmsCodes.value.map(code => ({
+      ...code,
+      type: 'hms',
+      id: `hms_${code.code}`
+    }))
+    allCodes = allCodes.concat(hmsCodesWithType)
+  }
+  
+  // 搜索过滤
+  if (pageSearchQuery.value) {
+    const query = pageSearchQuery.value.toLowerCase()
+    allCodes = allCodes.filter(code => {
+      if (code.type === 'dji') {
+        return (code.code && code.code.toLowerCase().includes(query)) ||
+               (code.description && code.description.toLowerCase().includes(query)) ||
+               (code.level && code.level.toLowerCase().includes(query))
+      } else {
+        return (code.code && code.code.toLowerCase().includes(query)) ||
+               (code.zh && code.zh.toLowerCase().includes(query)) ||
+               (code.en && code.en.toLowerCase().includes(query))
+      }
+    })
+  }
+  
+  pageFilteredCodes.value = allCodes
+  console.log('页面错误码总数:', allCodes.length)
+}
+
+const handlePageSearch = () => {
+  currentPage.value = 1
+  updatePageFilteredCodes()
+}
+
+const handlePageDataSourceChange = () => {
+  currentPage.value = 1
+  updatePageFilteredCodes()
+}
+
+const handlePageChange = (page) => {
+  currentPage.value = page
+}
+
+const showErrorCodePageDetail = (errorCode) => {
+  if (errorCode.type === 'dji') {
+    showErrorCodeDetail(errorCode)
+  } else {
+    showHmsErrorDetail(errorCode)
+  }
+}
 const closeErrorDoc = () => {
   errorDocVisible.value = false
 }
 
 const openConnMgr = () => { connMgrRef.value && connMgrRef.value.open() }
 
+// 打开消息详情对话框
+const openMessageDetail = () => {
+  messageDetailVisible.value = true
+}
+
 // 网络诊断功能
 const runDiagnostics = async () => {
-  if (!mqttStore.currentConfig) {
+  if (!mqttProxyStore.currentConfig) {
     ElMessage.warning('请先配置MQTT连接信息')
     return
   }
 
-  const config = mqttStore.currentConfig
+  const config = mqttProxyStore.currentConfig
   ElMessage.info('开始网络诊断...')
   
   try {
     // 检查网络连通性
     console.log('开始网络连通性检查...', { host: config.host, port: config.port })
-    const networkResult = await mqttStore.checkNetworkConnectivity(config.host, config.port)
+    const networkResult = await mqttProxyStore.checkNetworkConnectivity(config.host, config.port)
     console.log('网络连通性检查结果:', networkResult)
     
     if (networkResult.success) {
@@ -1271,7 +1903,7 @@ const runDiagnostics = async () => {
     // 测试MQTT连接
     try {
       console.log('开始MQTT连接测试...', config)
-      await mqttStore.testConnection({ config })
+      await mqttProxyStore.testConnection({ config })
       ElMessage.success('MQTT连接测试通过')
     } catch (mqttError) {
       console.error('MQTT连接测试失败:', mqttError)
@@ -1288,11 +1920,200 @@ const runDiagnostics = async () => {
 onMounted(() => {
   // 加载保存的主题顺序
   loadTopicCategoryOrder()
+  // 加载错误码数据
+  loadErrorCodes()
 })
 
 // 组件卸载时断开连接
 onUnmounted(() => {
   // 可以选择是否在组件卸载时断开连接
-  // mqttStore.disconnect()
+  // mqttProxyStore.disconnect()
 })
  </script>
+
+<style scoped>
+.dashboard {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.dashboard-aside {
+  border-right: 1px solid var(--el-border-color);
+  background: var(--el-fill-color-blank);
+  transition: width 0.3s ease;
+  overflow: hidden;
+}
+
+.dashboard-aside.collapsed {
+  width: 0 !important;
+  border-right: none;
+}
+
+.sidebar-content {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+
+.topic-list-card {
+  margin-bottom: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.topic-list-card .el-card__body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dashboard-header {
+  border-bottom: 1px solid var(--el-border-color);
+  background: var(--el-fill-color-blank);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collapse-btn {
+  flex-shrink: 0;
+}
+
+.dashboard-main {
+  padding: 16px;
+  background: var(--el-fill-color-lighter);
+  overflow-y: auto;
+}
+
+.device-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.device-card {
+  min-height: 200px;
+}
+
+.device-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.device-content {
+  padding: 8px 0;
+}
+
+.device-info p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.topic-categories {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.topic-category {
+  margin-bottom: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 6px;
+  padding: 8px;
+  background: var(--el-fill-color-blank);
+  transition: all 0.3s;
+}
+
+.topic-category:hover {
+  border-color: var(--el-color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.category-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.drag-handle {
+  cursor: move;
+  color: var(--el-text-color-secondary);
+}
+
+.topic-item {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: var(--el-fill-color-light);
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.topic-item:hover {
+  border-color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+
+.topic-name {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  margin-bottom: 4px;
+}
+
+.topic-path {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 4px;
+}
+
+.topic-desc {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.4;
+}
+
+.error-message {
+  margin-bottom: 16px;
+}
+
+.topic-messages-container {
+  margin-top: 16px;
+}
+</style>

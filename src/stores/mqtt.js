@@ -1,8 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import mqtt from 'mqtt'
 import axios from 'axios'
-import { buildMqttUrl, generateClientId } from '../utils/mqtt'
+import { generateClientId } from '../utils/mqtt'
 
 export const useMqttStore = defineStore('mqtt', () => {
   // 状态
@@ -54,6 +53,11 @@ export const useMqttStore = defineStore('mqtt', () => {
     try {
       isConnecting.value = true
       connectionError.value = null
+
+      // 如果没有配置，先加载配置
+      if (!currentConfig.value) {
+        await loadProfiles()
+      }
 
       const cfg = currentConfig.value || defaultConfig
       const url = buildMqttUrl(cfg)

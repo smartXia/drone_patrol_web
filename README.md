@@ -1,185 +1,312 @@
-# 无人机设备监控系统
+# 大疆无人机设备实时状态监控系统
 
-基于Vue 3 + Element Plus + MQTT.js的大疆无人机设备实时状态监控系统。
+一个基于 Vue 3 + FastAPI + MQTT 的现代化无人机设备监控平台，支持实时数据接收、设备状态监控、消息管理和 Redis 数据存储。
 
-## 功能特性
+## 📸 系统截图
 
-- 🔌 **MQTT实时连接**: 支持连接MQTT broker，实时接收设备状态数据
-- 📊 **设备状态监控**: 实时显示无人机设备状态、属性、遥测数据
-- 📈 **数据可视化**: 支持原始数据和格式化数据两种显示模式
-- 📝 **消息历史**: 记录和查看历史消息数据
-- 🔄 **自动重连**: 支持网络断开自动重连机制
-- 🎨 **现代化UI**: 基于Element Plus的现代化用户界面
-- 📱 **响应式设计**: 支持多种屏幕尺寸
+### 主界面概览
+![主界面](docs/screenshots/main-dashboard.png)
+*系统主界面 - 设备监控面板和主题订阅管理*
 
-## 技术栈
+### MQTT 连接管理
+![MQTT连接管理](docs/screenshots/mqtt-connection.png)
+*MQTT 连接配置和管理界面*
 
-- **前端框架**: Vue 3 (Composition API)
-- **状态管理**: Pinia
-- **UI组件库**: Element Plus
-- **MQTT客户端**: MQTT.js
-- **构建工具**: Vite
-- **路由**: Vue Router 4
-- **时间处理**: Day.js
+### 设备状态监控
+![设备状态](docs/screenshots/device-status.png)
+*实时设备状态监控和消息显示*
 
-## 快速开始
+### Redis 数据管理
+![Redis管理](docs/screenshots/redis-explorer.png)
+*Redis 数据浏览和管理界面*
+
+### 消息详情对话框
+![消息详情](docs/screenshots/message-dialog.png)
+*消息详情查看和搜索功能*
+
+### 错误码查询
+![错误码查询](docs/screenshots/error-codes.png)
+*DJI 错误码查询和搜索功能*
+
+## ✨ 功能特性
+
+### 🚁 设备监控
+- **实时状态监控**：实时显示无人机设备状态和运行数据
+- **多主题订阅**：支持订阅多个 MQTT 主题进行数据收集
+- **设备卡片**：直观的设备状态卡片展示
+- **QoS 级别显示**：显示消息的 QoS 级别信息
+
+### 📡 MQTT 管理
+- **连接管理**：支持多个 MQTT 连接配置的保存和管理
+- **主题订阅**：可视化主题订阅和取消订阅
+- **消息记录**：实时消息接收和历史记录查看
+- **消息搜索**：支持消息内容搜索和过滤
+
+### 🗄️ Redis 管理
+- **数据浏览**：支持 Redis 数据的可视化浏览
+- **多数据类型**：支持 String、Hash、List、Set、ZSet 等数据类型
+- **数据操作**：支持数据的增删改查操作
+- **连接管理**：支持多个 Redis 连接配置
+
+### 📊 错误码查询
+- **DJI 错误码**：内置大疆错误码查询功能
+- **快速搜索**：支持错误码的快速搜索和查看
+- **详细信息**：提供错误码的详细说明和解决方案
+
+## 🛠️ 技术栈
+
+### 前端
+- **Vue 3** - 渐进式 JavaScript 框架
+- **Element Plus** - Vue 3 UI 组件库
+- **Pinia** - Vue 状态管理
+- **Vue Router** - 路由管理
+- **Axios** - HTTP 客户端
+- **ECharts** - 数据可视化
+
+### 后端
+- **FastAPI** - 现代 Python Web 框架
+- **SQLite** - 轻量级数据库
+- **Redis** - 内存数据库
+- **Paho MQTT** - MQTT 客户端库
+- **WebSocket** - 实时通信
+
+### 桌面应用
+- **Electron** - 跨平台桌面应用框架
+- **Tauri** - 轻量级桌面应用框架
+
+## 📦 安装和运行
 
 ### 环境要求
+- Node.js 16+
+- Python 3.8+
+- Redis 服务器
 
-- Node.js >= 16.0.0
-- npm >= 8.0.0
+### 1. 克隆项目
+```bash
+git clone <repository-url>
+cd drone-patrol-web
+```
 
-### 安装依赖
+### 2. 创建截图目录（可选）
+```bash
+# 创建文档和截图目录
+mkdir -p docs/screenshots
+```
 
+### 3. 安装前端依赖
 ```bash
 npm install
+# 或
+yarn install
 ```
 
-### 启动开发服务器
-
+### 4. 安装后端依赖
 ```bash
-npm run dev
+# 创建虚拟环境
+python -m venv .venv
+
+# 激活虚拟环境
+# Windows
+.venv\Scripts\activate
+# Linux/Mac
+source .venv/bin/activate
+
+# 安装依赖
+pip install -r backend/requirements.txt
 ```
 
-### 构建生产版本
+### 5. 启动服务
 
+#### 开发模式（推荐）
+```bash
+# 同时启动前端和后端
+npm run dev:full
+```
+
+#### 分别启动
+```bash
+# 启动前端开发服务器
+npm run dev
+
+# 启动后端 API 服务器
+npm run dev:py
+```
+
+### 6. 访问应用
+- 前端地址：http://localhost:5173
+- 后端 API：http://localhost:8080
+- API 文档：http://localhost:8080/docs
+
+## 🚀 构建和部署
+
+### 构建前端
 ```bash
 npm run build
 ```
 
-### 预览生产版本
+### 构建桌面应用
 
+#### Electron 应用
 ```bash
-npm run preview
+# 开发模式
+npm run electron:dev
+
+# 构建应用
+npm run electron:build
 ```
 
-## 项目结构
+#### Tauri 应用
+```bash
+# 开发模式
+npm run tauri:dev
+
+# 构建应用
+npm run tauri:build
+```
+
+## 📁 项目结构
 
 ```
 drone-patrol-web/
-├── src/
-│   ├── components/          # 组件目录
-│   │   └── DeviceStatusCard.vue
-│   ├── stores/             # 状态管理
-│   │   └── mqtt.js
-│   ├── utils/              # 工具函数
-│   │   ├── mqtt.js
-│   │   └── time.js
-│   ├── views/              # 页面组件
-│   │   └── Dashboard.vue
-│   ├── router/             # 路由配置
-│   │   └── index.js
-│   ├── App.vue             # 根组件
-│   └── main.js             # 入口文件
-├── index.html              # HTML模板
-├── package.json            # 项目配置
-├── vite.config.js          # Vite配置
-└── README.md               # 项目说明
+├── backend/                 # 后端服务
+│   ├── app/
+│   │   └── main.py         # FastAPI 主应用
+│   ├── data/
+│   │   └── backend.db      # SQLite 数据库
+│   └── requirements.txt    # Python 依赖
+├── src/                    # 前端源码
+│   ├── components/         # Vue 组件
+│   │   ├── mqtt/          # MQTT 相关组件
+│   │   └── redis/         # Redis 相关组件
+│   ├── views/             # 页面组件
+│   ├── stores/            # Pinia 状态管理
+│   ├── api/               # API 接口
+│   └── utils/             # 工具函数
+├── docs/                  # 项目文档
+│   └── screenshots/       # 系统截图
+│       ├── main-dashboard.png
+│       ├── mqtt-connection.png
+│       ├── device-status.png
+│       ├── redis-explorer.png
+│       ├── message-dialog.png
+│       └── error-codes.png
+├── electron/              # Electron 主进程
+├── src-tauri/             # Tauri 配置
+├── public/                # 静态资源
+└── dist/                  # 构建输出
 ```
 
-## MQTT配置
+## 🔧 配置说明
 
-系统默认配置连接到以下MQTT broker：
+### MQTT 连接配置
+系统支持保存多个 MQTT 连接配置，包括：
+- 服务器地址和端口
+- 用户名和密码
+- 客户端 ID
+- 连接协议（TCP/WebSocket）
 
-- **Broker**: `tcp://180.102.24.183:1883`
-- **用户名**: `admin`
-- **密码**: `njbc@2216446`
+### Redis 连接配置
+支持配置多个 Redis 连接：
+- 主机地址和端口
+- 数据库编号
+- 密码认证
 
-### 订阅主题
+### 数据库
+- **SQLite**：存储 MQTT 连接配置和系统设置
+- **Redis**：存储实时数据和消息历史
 
-系统会自动订阅以下主题：
+## 📖 使用指南
 
-- `device/+/properties` - 设备属性
-- `device/+/status` - 设备状态
-- `device/+/telemetry` - 设备遥测数据
-- `device/+/events` - 设备事件
+### 1. 连接 MQTT 服务器
+1. 点击右上角"MQTT 连接管理"按钮
+2. 配置 MQTT 服务器信息
+3. 测试连接并保存配置
+4. 选择配置并连接
 
-## 使用说明
+### 2. 订阅主题
+1. 在左侧主题列表中选择要订阅的主题
+2. 点击"订阅"按钮
+3. 订阅的主题会显示在设备监控面板中
 
-### 1. 连接MQTT
+### 3. 查看设备状态
+1. 设备状态会实时显示在主面板中
+2. 点击设备卡片可查看详细消息
+3. 支持消息搜索和过滤
 
-点击"连接MQTT"按钮建立与MQTT broker的连接。
+### 4. 管理 Redis 数据
+1. 切换到"Redis 管理"页面
+2. 配置 Redis 连接
+3. 浏览和管理 Redis 数据
 
-### 2. 查看设备状态
+## 🐛 故障排除
 
-连接成功后，系统会自动接收并显示设备状态数据。
+### 常见问题
 
-### 3. 查看消息历史
+1. **MQTT 连接失败**
+   - 检查服务器地址和端口
+   - 确认用户名密码正确
+   - 检查网络连接
 
-在页面底部可以查看最近的消息历史记录。
+2. **Redis 连接失败**
+   - 确认 Redis 服务已启动
+   - 检查连接配置
+   - 确认防火墙设置
 
-### 4. 设备操作
+3. **前端无法访问后端**
+   - 确认后端服务已启动
+   - 检查端口是否被占用
+   - 查看控制台错误信息
 
-- **刷新**: 刷新设备状态数据
-- **历史记录**: 查看设备的历史消息
-- **格式化/原始**: 切换数据显示模式
+### 日志查看
+- 前端日志：浏览器开发者工具控制台
+- 后端日志：终端输出
+- 数据库日志：SQLite 和 Redis 日志
 
-## 开发指南
-
-### 添加新的设备类型
-
-1. 在 `src/utils/mqtt.js` 中的 `DEVICE_TYPES` 枚举中添加新类型
-2. 在 `getDeviceTypeIcon` 函数中添加对应的图标
-
-### 自定义MQTT主题
-
-修改 `src/stores/mqtt.js` 中的 `subscribeToTopics` 函数来订阅自定义主题。
-
-### 扩展设备状态显示
-
-在 `src/utils/mqtt.js` 中添加新的状态处理函数。
-
-## 部署说明
-
-### 构建生产版本
-
-```bash
-npm run build
-```
-
-构建完成后，`dist` 目录包含可部署的静态文件。
-
-### 部署到Web服务器
-
-将 `dist` 目录中的文件部署到任何支持静态文件的Web服务器。
-
-### 环境变量配置
-
-可以通过环境变量配置MQTT连接参数：
-
-```bash
-VITE_MQTT_HOST=your-mqtt-host
-VITE_MQTT_PORT=1883
-VITE_MQTT_USERNAME=your-username
-VITE_MQTT_PASSWORD=your-password
-```
-
-## 故障排除
-
-### 连接问题
-
-1. 检查MQTT broker是否可访问
-2. 验证用户名和密码是否正确
-3. 检查网络连接
-
-### 数据不显示
-
-1. 确认设备正在发送数据
-2. 检查订阅的主题是否正确
-3. 查看浏览器控制台是否有错误信息
-
-## 贡献指南
+## 🤝 贡献指南
 
 1. Fork 项目
-2. 创建功能分支
-3. 提交更改
-4. 推送到分支
-5. 创建 Pull Request
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 打开 Pull Request
 
-## 许可证
+## 📄 许可证
 
-MIT License
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
 
-## 联系方式
+## 📞 支持
 
-如有问题或建议，请提交 Issue 或联系开发团队。
+如有问题或建议，请：
+- 提交 Issue
+- 发送邮件至 support@example.com
+- 查看项目文档
+
+## 🙏 致谢
+
+感谢以下开源项目的支持：
+- Vue.js
+- Element Plus
+- FastAPI
+- Redis
+- MQTT.js
+- Electron
+
+## 📷 截图说明
+
+### 如何添加截图
+1. 将截图文件保存到 `docs/screenshots/` 目录
+2. 确保截图文件名与 README 中的引用一致
+3. 建议截图尺寸：1920x1080 或 1440x900
+4. 推荐使用 PNG 格式以获得更好的显示效果
+
+### 截图清单
+- [ ] `main-dashboard.png` - 主界面概览
+- [ ] `mqtt-connection.png` - MQTT 连接管理
+- [ ] `device-status.png` - 设备状态监控
+- [ ] `redis-explorer.png` - Redis 数据管理
+- [ ] `message-dialog.png` - 消息详情对话框
+- [ ] `error-codes.png` - 错误码查询
+
+---
+
+**大疆无人机设备实时状态监控系统** - 让无人机监控更简单、更高效！

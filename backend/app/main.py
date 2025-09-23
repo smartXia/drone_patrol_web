@@ -1,4 +1,12 @@
-from fastapi import FastAPI, HTTPException, Body
+# -*- coding: utf-8 -*-
+import sys
+import io
+
+# 设置标准输出编码为UTF-8
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+from fastapi import FastAPI, HTTPException, Body, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import socket
@@ -9,12 +17,177 @@ import sqlite3
 import uuid
 import redis
 import paho.mqtt.client as mqtt
+import asyncio
+import threading
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi.middleware.cors import CORSMiddleware
 
 # 数据库路径
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'backend.db')
+
+# MQTT 代理管理器
+class MQTTProxy:
+    def __init__(self):
+        self.mqtt_client = None
+        self.websocket_clients = set()
+        self.is_connected = False
+        self._loop = None
+        
+    def set_event_loop(self, loop):
+        """设置事件循环引用"""
+        self._loop = loop
+        
+    def _schedule_broadcast(self, message):
+        """线程安全地调度广播消息"""
+        if self._loop and not self._loop.is_closed():
+            asyncio.run_coroutine_threadsafe(
+                self.broadcast_to_websockets(message), 
+                self._loop
+            )
+        
+    def connect_mqtt(self, host: str, port: int, username: str = None, password: str = None, client_id: str = None):
+        """连接到 MQTT 服务器"""
+        try:
+            # 如果已经连接，先断开
+            if self.mqtt_client and self.is_connected:
+                print("MQTT 已连接，先断开旧连接")
+                self.mqtt_client.disconnect()
+                self.mqtt_client.loop_stop()
+                self.mqtt_client = None
+                self.is_connected = False
+            
+            # 创建新的 MQTT 客户端
+            self.mqtt_client = mqtt.Client(client_id or f"proxy_{uuid.uuid4().hex[:8]}")
+            
+            if username:
+                self.mqtt_client.username_pw_set(username, password)
+            
+            # 设置回调函数
+            self.mqtt_client.on_connect = self.on_mqtt_connect
+            self.mqtt_client.on_disconnect = self.on_mqtt_disconnect
+            self.mqtt_client.on_message = self.on_mqtt_message
+            
+            # 连接到 MQTT 服务器
+            self.mqtt_client.connect(host, port, 60)
+            self.mqtt_client.loop_start()
+            
+            return True
+        except Exception as e:
+            print(f"MQTT 连接失败: {e}")
+            # 发送连接失败消息
+            self._schedule_broadcast({
+                "type": "connect_result",
+                "success": False,
+                "message": f"MQTT 连接失败: {e}"
+            })
+            return False
+    
+    def on_mqtt_connect(self, client, userdata, flags, rc):
+        """MQTT 连接成功回调"""
+        if rc == 0:
+            self.is_connected = True
+            print("MQTT 连接成功")
+            # 通知所有 WebSocket 客户端连接成功
+            self._schedule_broadcast({
+                "type": "connect_result",
+                "success": True,
+                "message": "MQTT 连接成功"
+            })
+        else:
+            print(f"MQTT 连接失败，错误码: {rc}")
+            # 通知所有 WebSocket 客户端连接失败
+            self._schedule_broadcast({
+                "type": "connect_result",
+                "success": False,
+                "message": f"MQTT 连接失败，错误码: {rc}"
+            })
+    
+    def on_mqtt_disconnect(self, client, userdata, rc):
+        """MQTT 断开连接回调"""
+        self.is_connected = False
+        print("MQTT 连接断开")
+        self._schedule_broadcast({
+            "type": "mqtt_disconnected",
+            "message": "MQTT 连接断开"
+        })
+    
+    def on_mqtt_message(self, client, userdata, msg):
+        """接收到 MQTT 消息回调"""
+        print(f"收到MQTT消息: {msg.topic}")
+        message = {
+            "type": "mqtt_message",
+            "topic": msg.topic,
+            "payload": msg.payload.decode('utf-8'),
+            "qos": msg.qos,
+            "retain": msg.retain
+        }
+        print(f"广播消息到 {len(self.websocket_clients)} 个WebSocket客户端")
+        self._schedule_broadcast(message)
+    
+    def subscribe(self, topic: str, qos: int = 0):
+        """订阅 MQTT 主题"""
+        print(f"尝试订阅主题: {topic}, QoS: {qos}")
+        print(f"MQTT客户端状态: {self.mqtt_client is not None}, 连接状态: {self.is_connected}")
+        
+        if self.mqtt_client and self.is_connected:
+            result = self.mqtt_client.subscribe(topic, qos)
+            print(f"订阅结果: {result}")
+            if result[0] == mqtt.MQTT_ERR_SUCCESS:
+                print(f"订阅成功: {topic}")
+                success_message = {
+                    "type": "subscription_success",
+                    "topic": topic,
+                    "qos": qos
+                }
+                print(f"发送订阅成功消息: {success_message}")
+                self._schedule_broadcast(success_message)
+                return True
+            else:
+                print(f"订阅失败: {topic}, 错误码: {result[0]}")
+        else:
+            print(f"无法订阅: MQTT客户端={self.mqtt_client is not None}, 连接状态={self.is_connected}")
+        return False
+    
+    def publish(self, topic: str, payload: str, qos: int = 0, retain: bool = False):
+        """发布 MQTT 消息"""
+        if self.mqtt_client and self.is_connected:
+            result = self.mqtt_client.publish(topic, payload, qos, retain)
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                return True
+        return False
+    
+    def add_websocket_client(self, websocket: WebSocket):
+        """添加 WebSocket 客户端"""
+        self.websocket_clients.add(websocket)
+    
+    def remove_websocket_client(self, websocket: WebSocket):
+        """移除 WebSocket 客户端"""
+        self.websocket_clients.discard(websocket)
+    
+    async def broadcast_to_websockets(self, message: dict):
+        """向所有 WebSocket 客户端广播消息"""
+        if self.websocket_clients:
+            disconnected = set()
+            for websocket in self.websocket_clients:
+                try:
+                    await websocket.send_text(json.dumps(message))
+                except:
+                    disconnected.add(websocket)
+            
+            # 移除断开的连接
+            for websocket in disconnected:
+                self.websocket_clients.discard(websocket)
+    
+    def disconnect(self):
+        """断开 MQTT 连接"""
+        if self.mqtt_client:
+            self.mqtt_client.loop_stop()
+            self.mqtt_client.disconnect()
+            self.is_connected = False
+
+# 全局 MQTT 代理实例
+mqtt_proxy = MQTTProxy()
 
 def get_db():
     """获取SQLite数据库连接"""
@@ -46,6 +219,11 @@ class RedisConnectPayload(BaseModel):
     db: int = 0
 
 app = FastAPI(title="Unified Backend (Python)")
+
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时设置事件循环引用"""
+    mqtt_proxy.set_event_loop(asyncio.get_running_loop())
 
 # CORS（允许前端直接请求本服务）
 app.add_middleware(
@@ -83,6 +261,89 @@ def _get_redis(payload: Dict[str, Any]) -> redis.Redis:
 def health():
     """健康检查"""
     return {"code": 0, "message": "ok", "data": {"service": "unified-python", "version": "1.0.0"}}
+
+@app.get("/api/error-codes")
+async def get_error_codes():
+    """获取错误码列表"""
+    try:
+        # 读取错误码文档
+        error_codes_file = os.path.join(os.path.dirname(__file__), '..', '..', 'public', 'docs', 'dji-error-codes.md')
+        with open(error_codes_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        lines = content.split('\n')
+        error_codes = []
+        
+        for i, line in enumerate(lines[1:], 1):  # 跳过标题行
+            if line.strip():
+                parts = line.split('\t')
+                if len(parts) >= 2:
+                    code = parts[0].strip()
+                    description = parts[1].strip()
+                    
+                    # 根据错误码范围确定分类
+                    code_num = int(code) if code.isdigit() else 0
+                    category = get_error_category(code_num)
+                    severity = get_error_severity(description)
+                    
+                    error_codes.append({
+                        "code": code,
+                        "description": description,
+                        "category": category,
+                        "severity": severity
+                    })
+        
+        return {
+            "code": 0,
+            "message": "ok",
+            "data": error_codes
+        }
+    except Exception as e:
+        return {
+            "code": 1,
+            "message": f"获取错误码失败: {str(e)}",
+            "data": []
+        }
+
+def get_error_category(code_num):
+    """根据错误码确定分类"""
+    if 312000 <= code_num < 315000:
+        return "upgrade"
+    elif 314000 <= code_num < 317000:
+        return "flight"
+    elif 315000 <= code_num < 316000:
+        return "communication"
+    elif 316000 <= code_num < 317000:
+        return "battery"
+    elif 317000 <= code_num < 319000:
+        return "media"
+    elif 319000 <= code_num < 322000:
+        return "system"
+    elif 321000 <= code_num < 325000:
+        return "flight"
+    elif 325000 <= code_num < 327000:
+        return "network"
+    elif 327000 <= code_num < 329000:
+        return "camera"
+    elif 336000 <= code_num < 339000:
+        return "flight"
+    elif 338000 <= code_num < 339000:
+        return "flight"
+    elif 514000 <= code_num < 515000:
+        return "weather"
+    else:
+        return "other"
+
+def get_error_severity(description):
+    """根据描述确定严重程度"""
+    if any(keyword in description for keyword in ["失败", "异常", "错误", "无法"]):
+        return "error"
+    elif any(keyword in description for keyword in ["超时", "请重试", "稍后"]):
+        return "warning"
+    elif any(keyword in description for keyword in ["成功", "完成"]):
+        return "success"
+    else:
+        return "info"
 
 @app.get('/api/network/ping')
 def ping(host: str, port: int):
@@ -545,6 +806,91 @@ def z_incrby(payload: Dict[str, Any] = Body(...)):
     inc = float(payload.get("increment", 1))
     new_score = r.zincrby(key, inc, member)
     return {"score": float(new_score)}
+
+# WebSocket 端点
+@app.websocket("/ws/mqtt")
+async def websocket_mqtt_proxy(websocket: WebSocket):
+    """MQTT WebSocket 代理端点"""
+    await websocket.accept()
+    mqtt_proxy.add_websocket_client(websocket)
+    
+    try:
+        while True:
+            # 接收来自前端的消息
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            
+            if message["type"] == "connect":
+                # 连接 MQTT 服务器
+                config = message["config"]
+                
+                # 检查是否已经连接到相同的服务器
+                if (mqtt_proxy.is_connected and 
+                    hasattr(mqtt_proxy, '_last_config') and
+                    mqtt_proxy._last_config == config):
+                    print("MQTT 已连接到相同配置，跳过重复连接")
+                    await websocket.send_text(json.dumps({
+                        "type": "connect_result",
+                        "success": True
+                    }))
+                else:
+                    # 先发送连接请求，不等待结果
+                    mqtt_proxy.connect_mqtt(
+                        host=config["host"],
+                        port=config["port"],
+                        username=config.get("username"),
+                        password=config.get("password"),
+                        client_id=config.get("clientId")
+                    )
+                    
+                    # 保存配置
+                    mqtt_proxy._last_config = config
+                    
+                    # 不立即发送结果，等待 on_mqtt_connect 回调
+                    print(f"MQTT 连接请求已发送到 {config['host']}:{config['port']}")
+                
+            elif message["type"] == "subscribe":
+                # 订阅主题
+                topic = message["topic"]
+                qos = message.get("qos", 0)
+                success = mqtt_proxy.subscribe(topic, qos)
+                
+                await websocket.send_text(json.dumps({
+                    "type": "subscribe_result",
+                    "topic": topic,
+                    "success": success
+                }))
+                
+                if not success:
+                    print(f"订阅失败: {topic}")
+                
+            elif message["type"] == "publish":
+                # 发布消息
+                topic = message["topic"]
+                payload = message["payload"]
+                qos = message.get("qos", 0)
+                retain = message.get("retain", False)
+                success = mqtt_proxy.publish(topic, payload, qos, retain)
+                
+                await websocket.send_text(json.dumps({
+                    "type": "publish_result",
+                    "topic": topic,
+                    "success": success
+                }))
+                
+            elif message["type"] == "disconnect":
+                # 断开 MQTT 连接
+                mqtt_proxy.disconnect()
+                await websocket.send_text(json.dumps({
+                    "type": "disconnect_result",
+                    "success": True
+                }))
+                
+    except WebSocketDisconnect:
+        mqtt_proxy.remove_websocket_client(websocket)
+    except Exception as e:
+        print(f"WebSocket 错误: {e}")
+        mqtt_proxy.remove_websocket_client(websocket)
 
 if __name__ == '__main__':
     import uvicorn

@@ -826,3 +826,235 @@ pre {
     max-height: 200px;
   }
 }
+
+/* 主要内容区域布局 */
+.main-content {
+  display: flex;
+  gap: 20px;
+  height: calc(100vh - 120px);
+}
+
+.device-section {
+  flex: 2;
+  min-width: 0;
+}
+
+.error-codes-section {
+  flex: 1;
+  min-width: 300px;
+  max-width: 400px;
+}
+
+/* 错误码查询面板样式 */
+.error-codes-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.error-codes-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.source-tabs {
+  margin-bottom: 16px;
+}
+
+.search-section {
+  margin-bottom: 20px;
+}
+
+.search-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.search-input {
+  margin-bottom: 12px;
+}
+
+.error-codes-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.error-code-item {
+  padding: 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-small);
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg-white);
+}
+
+.error-code-item:hover {
+  border-color: var(--primary-color);
+  background: var(--bg-light);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.error-code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.error-code {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.error-description {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.error-description-en {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.3;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* 错误码详情页面样式 */
+.error-code-page-dialog .el-dialog__body {
+  padding: 0;
+}
+
+.error-code-page {
+  height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.search-controls {
+  display: flex;
+  align-items: center;
+}
+
+.page-search-input {
+  width: 300px;
+}
+
+.page-stats {
+  display: flex;
+  align-items: center;
+}
+
+.error-codes-page-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.error-code-page-item {
+  padding: 16px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius-small);
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--bg-white);
+}
+
+.error-code-page-item:hover {
+  border-color: var(--primary-color);
+  background: var(--bg-light);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.error-code-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.error-code-page-code {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.error-code-page-tags {
+  display: flex;
+  align-items: center;
+}
+
+.error-code-page-content {
+  color: var(--text-secondary);
+}
+
+.error-code-page-description {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.error-code-page-zh {
+  margin-bottom: 4px;
+}
+
+.error-code-page-en {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.pagination-container {
+  padding: 20px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .main-content {
+    flex-direction: column;
+  }
+  
+  .error-codes-section {
+    max-width: none;
+    height: 300px;
+  }
+  
+  .page-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+  
+  .search-controls {
+    justify-content: center;
+  }
+  
+  .page-stats {
+    justify-content: center;
+  }
+}

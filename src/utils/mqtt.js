@@ -130,6 +130,14 @@ export function generateClientId(prefix = 'drone_monitor') {
  */
 export function buildMqttUrl(config) {
   const { protocol, host, port, path } = config
+  
+  // 在浏览器环境中，TCP 协议需要转换为 WebSocket
+  if (protocol === 'tcp') {
+    // TCP 协议在浏览器中通过 WebSocket 实现，使用 1883 端口和 /mqtt 路径
+    return `ws://${host}:1883/mqtt`
+  }
+  
+  // WebSocket 协议需要路径
   const suffix = path && typeof path === 'string' && path.length > 0 ? (path.startsWith('/') ? path : `/${path}`) : '/mqtt'
   return `${protocol}://${host}:${port}${suffix}`
 }

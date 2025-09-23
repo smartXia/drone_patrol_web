@@ -1,29 +1,40 @@
 <template>
   <el-container style="height: 100%;">
-    <el-aside width="320px" class="redis-aside">
-      <connection-list
-        :profiles="profiles"
-        :currentProfileId="currentProfileId"
-        :connecting="connecting"
-        :connected="connected"
-        @save="handleSaveProfile"
-        @delete="handleDeleteProfile"
-        @connect="handleConnect"
-        @disconnect="handleDisconnect"
-        @select="handleSelectProfile"
-      />
+    <el-aside :width="sidebarCollapsed ? '0px' : '320px'" class="redis-aside" :class="{ 'collapsed': sidebarCollapsed }">
+      <div class="sidebar-content" v-show="!sidebarCollapsed">
+        <connection-list
+          :profiles="profiles"
+          :currentProfileId="currentProfileId"
+          :connecting="connecting"
+          :connected="connected"
+          @save="handleSaveProfile"
+          @delete="handleDeleteProfile"
+          @connect="handleConnect"
+          @disconnect="handleDisconnect"
+          @select="handleSelectProfile"
+        />
+      </div>
     </el-aside>
     <el-container>
       <el-header class="redis-header">
-        <key-search-bar
-          :pattern="pattern"
-          :typeFilter="typeFilter"
-          :loading="scanning"
-          @search="handleSearch"
-          @refresh="handleRefresh"
-          @reset="handleReset"
-        />
-        <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+        <div class="header-left">
+          <el-button 
+            :icon="sidebarCollapsed ? 'Expand' : 'Fold'" 
+            @click="toggleSidebar"
+            class="collapse-btn"
+            circle
+            size="small"
+          />
+          <key-search-bar
+            :pattern="pattern"
+            :typeFilter="typeFilter"
+            :loading="scanning"
+            @search="handleSearch"
+            @refresh="handleRefresh"
+            @reset="handleReset"
+          />
+        </div>
+        <div class="header-right">
           <el-button @click="gotoDashboard">返回仪表盘</el-button>
           <el-button type="primary" @click="gotoDashboardOpenMqtt">仪表盘打开MQTT</el-button>
         </div>
@@ -61,7 +72,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRedisStore } from '@/stores/redis'
 import { useRouter } from 'vue-router'
 import ConnectionList from '@/components/redis/ConnectionList.vue'
@@ -76,6 +87,9 @@ import KeyDetailZSet from '@/components/redis/KeyDetailZSet.vue'
 
 const store = useRedisStore()
 const router = useRouter()
+
+// 侧边栏折叠状态
+const sidebarCollapsed = ref(false)
 
 const profiles = computed(() => store.profiles)
 const currentProfileId = computed(() => store.currentProfileId)
@@ -126,6 +140,10 @@ function handleExpireKey({ key, ttl }) { store.expireKey(key, ttl) }
 function handlePersistKey(key) { store.persistKey(key) }
 function handleRefreshKey() { store.refreshSelected() }
 
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
 function gotoDashboard() { router.push({ name: 'Dashboard' }) }
 function gotoDashboardOpenMqtt() { router.push({ name: 'Dashboard', query: { openMqtt: 1 } }) }
 
@@ -135,9 +153,55 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.redis-aside { border-right: 1px solid var(--el-border-color); padding: 8px; background: var(--el-fill-color-blank); }
-.redis-header { border-bottom: 1px solid var(--el-border-color); padding: 8px 12px; background: var(--el-fill-color-blank); }
-.redis-main { padding: 8px; background: var(--el-fill-color-lighter); }
+.redis-aside { 
+  border-right: 1px solid var(--el-border-color); 
+  padding: 8px; 
+  background: var(--el-fill-color-blank);
+  transition: width 0.3s ease;
+  overflow: hidden;
+}
+
+.redis-aside.collapsed {
+  width: 0 !important;
+  padding: 0;
+  border-right: none;
+}
+
+.sidebar-content {
+  width: 100%;
+  height: 100%;
+}
+
+.redis-header { 
+  border-bottom: 1px solid var(--el-border-color); 
+  padding: 8px 12px; 
+  background: var(--el-fill-color-blank);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collapse-btn {
+  flex-shrink: 0;
+}
+
+.redis-main { 
+  padding: 8px; 
+  background: var(--el-fill-color-lighter); 
+}
 </style>
 
 

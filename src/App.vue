@@ -3,7 +3,32 @@
     <el-container class="app-container">
       <el-header class="app-header">
         <div class="header-content">
-          <h1>无人机设备监控系统</h1>
+          <div class="header-left">
+            <h1>无人机设备监控系统</h1>
+            <el-menu
+              :default-active="$route.path"
+              mode="horizontal"
+              background-color="transparent"
+              text-color="rgba(255, 255, 255, 0.8)"
+              active-text-color="#ffffff"
+              @select="handleMenuSelect"
+              class="nav-menu"
+              style="display: flex; gap: 0;"
+            >
+              <el-menu-item index="/">
+                <el-icon><Monitor /></el-icon>
+                <span>设备监控</span>
+              </el-menu-item>
+              <el-menu-item index="/redis">
+                <el-icon><DataBoard /></el-icon>
+                <span>Redis 管理</span>
+              </el-menu-item>
+              <el-menu-item index="/error-codes">
+                <el-icon><Document /></el-icon>
+                <span>错误码查询</span>
+              </el-menu-item>
+            </el-menu>
+          </div>
           <div class="connection-status">
             <el-tag :type="connectionStatus.type" size="large">
               {{ connectionStatus.text }}
@@ -21,8 +46,11 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useMqttStore } from '@/stores/mqtt'
+import { Monitor, DataBoard, Document } from '@element-plus/icons-vue'
 
+const router = useRouter()
 const mqttStore = useMqttStore()
 
 const connectionStatus = computed(() => {
@@ -34,6 +62,11 @@ const connectionStatus = computed(() => {
     return { type: 'danger', text: '未连接' }
   }
 })
+
+const handleMenuSelect = (index) => {
+  console.log('菜单选择:', index)
+  router.push(index)
+}
 </script>
 
 <style scoped>
@@ -52,6 +85,30 @@ const connectionStatus = computed(() => {
   justify-content: space-between;
   align-items: center;
   height: 100%;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.nav-menu {
+  border-bottom: none;
+}
+
+.nav-menu .el-menu-item {
+  border-bottom: 2px solid transparent;
+  transition: all 0.3s;
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-menu .el-menu-item:hover,
+.nav-menu .el-menu-item.is-active {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-bottom-color: #ffffff;
 }
 
 .header-content h1 {

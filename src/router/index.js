@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from '@/views/Dashboard.vue'
 const RedisExplorer = () => import('@/views/RedisExplorer.vue')
+const ErrorCodes = () => import('@/views/ErrorCodes.vue')
 
 const routes = [
   {
@@ -17,6 +18,14 @@ const routes = [
     component: RedisExplorer,
     meta: {
       title: 'Redis 可视化'
+    }
+  },
+  {
+    path: '/error-codes',
+    name: 'ErrorCodes',
+    component: ErrorCodes,
+    meta: {
+      title: 'DJI 错误码查询'
     }
   }
 ]
