@@ -225,7 +225,14 @@ app = FastAPI(title="Unified Backend (Python)")
 @app.on_event("startup")
 async def startup_event():
     """应用启动时设置事件循环引用"""
-    mqtt_proxy.set_event_loop(asyncio.get_running_loop())
+    # Python 3.6 兼容性处理
+    try:
+        # Python 3.7+ 使用 get_running_loop
+        loop = asyncio.get_running_loop()
+    except AttributeError:
+        # Python 3.6 使用 get_event_loop
+        loop = asyncio.get_event_loop()
+    mqtt_proxy.set_event_loop(loop)
 
 # CORS（允许前端直接请求本服务）
 app.add_middleware(
