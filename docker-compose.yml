@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # Redis 数据库
+  redis:
+    image: redis:7-alpine
+    container_name: drone-patrol-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 大疆无人机监控系统
+  drone-patrol:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: drone-patrol-app
+    ports:
+      - "18080:18080"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - MQTT_BROKER_HOST=your-mqtt-broker.com
+      - MQTT_BROKER_PORT=1883
+      - MQTT_USERNAME=your-username
+      - MQTT_PASSWORD=your-password
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./backend/data:/app/backend/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  redis_data:

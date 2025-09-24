@@ -1,0 +1,58 @@
+# 忽略文件
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+.env
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.pytest_cache
+
+# 构建文件
+build
+dist-electron
+*.exe
+*.spec
+
+# 临时文件
+.tmp
+.temp
+*.tmp
+*.temp
+
+# IDE 文件
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS 文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+logs
+*.log
+
+# 测试文件
+test
+tests
+*_test.py
+test_*.py
