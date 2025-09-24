@@ -2,7 +2,6 @@
 node_modules/
 
 # Build outputs
-/dist/
 /dist-electron/
 /src-tauri/target/
 
@@ -20,7 +19,7 @@ npm-debug.log*
  
   
 
-  
+
 # OS/Editor
 .DS_Store
 Thumbs.db

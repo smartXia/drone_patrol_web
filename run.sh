@@ -81,7 +81,7 @@ fi
 
 # 检查 Python 是否安装
 if ! command -v python3 &> /dev/null; then
-    echo -e "${RED}❌ 错误: 未找到 Python3，请先安装 Python 3.8+${NC}"
+    echo -e "${RED}❌ 错误: 未找到 Python3，请先安装 Python 3.6+${NC}"
     exit 1
 fi
 
@@ -96,9 +96,15 @@ fi
 echo -e "${BLUE}📦 激活虚拟环境...${NC}"
 source .venv/bin/activate
 
-# 安装依赖
-echo -e "${BLUE}📦 安装 Python 依赖...${NC}"
-pip install -r requirements.txt
+# 检查依赖是否已安装
+echo -e "${BLUE}📦 检查 Python 依赖...${NC}"
+if ! python -c "import fastapi, uvicorn, redis, paho.mqtt.client, websockets" 2>/dev/null; then
+    echo -e "${YELLOW}⚠️  依赖未安装，正在安装...${NC}"
+    pip install fastapi==0.65.0 uvicorn==0.13.4 redis==3.5.3 paho-mqtt==1.5.1 websockets==8.1
+    echo -e "${GREEN}✅ 依赖安装完成${NC}"
+else
+    echo -e "${GREEN}✅ 依赖检查通过${NC}"
+fi
 
 # 检查 Redis 是否运行
 echo -e "${BLUE}🔍 检查 Redis 服务...${NC}"
@@ -106,6 +112,13 @@ if ! pgrep -x "redis-server" > /dev/null; then
     echo -e "${YELLOW}⚠️  Redis 服务未运行，请先启动 Redis${NC}"
     echo "启动命令: sudo systemctl start redis"
     echo "或者: redis-server"
+    echo ""
+    read -p "是否继续启动后端服务？(y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "已取消启动"
+        exit 0
+    fi
 fi
 
 # 显示启动信息
