@@ -23,7 +23,6 @@ npm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
-.venv/
 
 # Package manager lock (prefer yarn)
 package-lock.json
