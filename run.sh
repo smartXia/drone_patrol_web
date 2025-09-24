@@ -96,15 +96,6 @@ fi
 echo -e "${BLUE}📦 激活虚拟环境...${NC}"
 source .venv/bin/activate
 
-# 检查依赖是否已安装
-# echo -e "${BLUE}📦 检查 Python 依赖...${NC}"
-# if ! python -c "import fastapi, uvicorn, redis, paho.mqtt.client, websockets" 2>/dev/null; then
-#     echo -e "${YELLOW}⚠️  依赖未安装，正在安装...${NC}"
-#     pip install fastapi==0.65.0 uvicorn==0.13.4 redis==3.5.3 paho-mqtt==1.5.1 websockets==8.1
-#     echo -e "${GREEN}✅ 依赖安装完成${NC}"
-# else
-#     echo -e "${GREEN}✅ 依赖检查通过${NC}"
-# fi
 
 
 # 显示启动信息
@@ -126,8 +117,8 @@ echo -e "${YELLOW}按 Ctrl+C 停止服务${NC}"
 echo ""
 
 # 启动 uvicorn
-python -m uvicorn backend.app.main:app \
+nohup python -m uvicorn backend.app.main:app \
     --host "$HOST" \
     --port "$PORT" \
     --log-level "$LOG_LEVEL" \
-    $RELOAD
+    $RELOAD > uvicorn.log 2>&1 &
