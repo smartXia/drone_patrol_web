@@ -4,25 +4,16 @@
   "description": "大疆无人机设备实时状态监控系统",
   "author": "DJI Solutions <support@example.com>",
   "license": "MIT",
-  "main": "electron/main.js",
   "homepage": "./",
   "scripts": {
     "dev": "vite",
     "dev:web": "vite",
-    "dev:py": ".venv\\Scripts\\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8080",
+    "dev:py": ".venv\\Scripts\\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 18080",
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:py\"",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
-    "start": "npm run build && vite preview",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "electron": "electron .",
-    "electron:dev": "cross-env NODE_ENV=development electron .",
-    "electron:build": "npm run build && electron-builder",
-    "electron:dist": "npm run build && electron-builder --publish=never",
-    "electron:pack": "npm run build && electron-builder --dir"
+    "start": "npm run build && vite preview"
   },
   "dependencies": {
     "axios": "^1.4.0",
@@ -40,36 +31,9 @@
     "@vitejs/plugin-vue": "^4.2.3",
     "@vue/eslint-config-prettier": "^8.0.0",
     "concurrently": "^9.2.1",
-    "cross-env": "^7.0.3",
-    "electron": "^27.0.0",
-    "electron-builder": "^24.6.4",
     "eslint": "^8.45.0",
     "eslint-plugin-vue": "^9.15.1",
     "prettier": "^3.0.0",
     "vite": "^4.4.5"
-  },
-  "build": {
-    "appId": "com.dji.drone-patrol-web",
-    "productName": "大疆无人机监控系统",
-    "directories": {
-      "output": "dist-electron"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "node_modules/**/*"
-    ],
-    "asar": true,
-    "win": {
-      "target": "nsis",
-      "icon": "src-tauri/icons/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "大疆无人机监控系统"
-    }
   }
 }

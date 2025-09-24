@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
 import { generateClientId } from '../utils/mqtt'
+import { API_BASE_URL, TIMEOUT } from '../config.js'
 
 export const useMqttStore = defineStore('mqtt', () => {
   // 状态
@@ -18,7 +19,7 @@ export const useMqttStore = defineStore('mqtt', () => {
   const currentProfileId = ref(null)
 
   // 后端本地服务地址
-  const apiBase = import.meta.env?.VITE_MQTT_API_BASE || 'http://127.0.0.1:8080'
+  const apiBase = API_BASE_URL
 
   // 计算属性
   const connectionStatus = computed(() => {

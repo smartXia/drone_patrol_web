@@ -1,6 +1,7 @@
 import axios from 'axios'
+import { API_BASE_URL, TIMEOUT } from '../config.js'
 
-const client = axios.create({ baseURL: 'http://127.0.0.1:8080', timeout: 15000 })
+const client = axios.create({ baseURL: API_BASE_URL, timeout: TIMEOUT })
 
 let activeConn = { host: '127.0.0.1', port: 6379, db: 0, password: '' }
 

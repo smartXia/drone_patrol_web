@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
 import { generateClientId } from '../utils/mqtt'
+import { API_BASE_URL, WS_BASE_URL, TIMEOUT } from '../config.js'
 
 export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
   // 状态
@@ -17,7 +18,7 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
   const currentProfileId = ref(null)
 
   // 后端本地服务地址
-  const apiBase = import.meta.env?.VITE_MQTT_API_BASE || 'http://127.0.0.1:8080'
+  const apiBase = API_BASE_URL
 
   // 计算属性
   const connectionStatus = computed(() => {
@@ -80,7 +81,7 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
       }
 
       // 创建 WebSocket 连接到后端代理
-      const wsUrl = `ws://127.0.0.1:8080/ws/mqtt`
+      const wsUrl = `${WS_BASE_URL}/ws/mqtt`
       websocket.value = new WebSocket(wsUrl)
 
       websocket.value.onopen = () => {
@@ -171,7 +172,7 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
       }
 
       // 创建 WebSocket 连接到后端代理
-      const wsUrl = `ws://127.0.0.1:8080/ws/mqtt`
+      const wsUrl = `${WS_BASE_URL}/ws/mqtt`
       websocket.value = new WebSocket(wsUrl)
 
       websocket.value.onopen = () => {

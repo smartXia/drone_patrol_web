@@ -150,6 +150,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import axios from 'axios'
+import { API_BASE_URL } from '../config.js'
 
 // 响应式数据
 const searchQuery = ref('')
@@ -207,7 +208,7 @@ const paginatedCodes = computed(() => {
 // 方法
 const loadErrorCodes = async () => {
   try {
-    const response = await axios.get('http://127.0.0.1:8080/api/error-codes')
+    const response = await axios.get(`${API_BASE_URL}/api/error-codes`)
     if (response.data.code === 0) {
       errorCodes.value = response.data.data
     } else {

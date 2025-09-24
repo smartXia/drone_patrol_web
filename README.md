@@ -70,9 +70,6 @@
 - **Paho MQTT** - MQTT 客户端库
 - **WebSocket** - 实时通信
 
-### 桌面应用
-- **Electron** - 跨平台桌面应用框架
-- **Tauri** - 轻量级桌面应用框架
 
 ## 📦 安装和运行
 
@@ -144,25 +141,7 @@ npm run dev:py
 npm run build
 ```
 
-### 构建桌面应用
 
-#### Electron 应用
-```bash
-# 开发模式
-npm run electron:dev
-
-# 构建应用
-npm run electron:build
-```
-
-#### Tauri 应用
-```bash
-# 开发模式
-npm run tauri:dev
-
-# 构建应用
-npm run tauri:build
-```
 
 ## 📁 项目结构
 
@@ -190,13 +169,24 @@ drone-patrol-web/
 │       ├── redis-explorer.png
 │       ├── message-dialog.png
 │       └── error-codes.png
-├── electron/              # Electron 主进程
-├── src-tauri/             # Tauri 配置
 ├── public/                # 静态资源
 └── dist/                  # 构建输出
 ```
 
+
 ## 🔧 配置说明
+
+### 环境变量配置
+复制 `env.example` 文件为 `.env` 并根据需要修改：
+
+```bash
+cp env.example .env
+```
+
+环境变量说明：
+- `VITE_API_BASE_URL`: 后端 API 基础地址（默认：http://127.0.0.1:18080）
+- `VITE_WS_BASE_URL`: WebSocket 基础地址（默认：ws://127.0.0.1:18080）
+- `VITE_DEV_MODE`: 开发模式（默认：true）
 
 ### MQTT 连接配置
 系统支持保存多个 MQTT 连接配置，包括：
@@ -289,7 +279,6 @@ drone-patrol-web/
 - FastAPI
 - Redis
 - MQTT.js
-- Electron
 
 ## 📷 截图说明
 
@@ -306,6 +295,7 @@ drone-patrol-web/
 - [ ] `redis-explorer.png` - Redis 数据管理
 - [ ] `message-dialog.png` - 消息详情对话框
 - [ ] `error-codes.png` - 错误码查询
+
 
 ---
 
