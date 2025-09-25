@@ -4,7 +4,8 @@ export const config = {
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:18080',
   wsBaseUrl: import.meta.env.VITE_WS_BASE_URL || 'ws://127.0.0.1:18080',
   
-  // 开发环境配置
+  // 环境配置
+  env: import.meta.env.VITE_ENV || 'development',
   devMode: import.meta.env.VITE_DEV_MODE === 'true' || import.meta.env.DEV,
   
   // 超时配置

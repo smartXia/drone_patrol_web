@@ -6,14 +6,18 @@
   "license": "MIT",
   "homepage": "./",
   "scripts": {
-    "dev": "vite",
-    "dev:web": "vite",
+    "dev": "vite --mode development",
+    "dev:web": "vite --mode development",
     "dev:py": ".venv\\Scripts\\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 18080",
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:py\"",
-    "build": "vite build",
+    "build": "vite build --mode production",
+    "build:dev": "vite build --mode development",
+    "build:prod": "vite build --mode production",
     "preview": "vite preview",
+    "preview:dev": "vite preview --mode development",
+    "preview:prod": "vite preview --mode production",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
-    "start": "npm run build && vite preview"
+    "start": "npm run build:prod && vite preview --mode production"
   },
   "dependencies": {
     "axios": "^1.4.0",

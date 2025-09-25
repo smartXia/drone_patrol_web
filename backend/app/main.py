@@ -32,7 +32,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'backend.db')
 class MQTTProxy:
     def __init__(self):
         self.mqtt_client = None
-        self.websocket_clients = set()
+        self.websocket_clients = []  # 改为列表，避免 WebSocket 对象不可哈希的问题
         self.is_connected = False
         self._loop = None
         
@@ -161,25 +161,28 @@ class MQTTProxy:
     
     def add_websocket_client(self, websocket: WebSocket):
         """添加 WebSocket 客户端"""
-        self.websocket_clients.add(websocket)
+        if websocket not in self.websocket_clients:
+            self.websocket_clients.append(websocket)
     
     def remove_websocket_client(self, websocket: WebSocket):
         """移除 WebSocket 客户端"""
-        self.websocket_clients.discard(websocket)
+        if websocket in self.websocket_clients:
+            self.websocket_clients.remove(websocket)
     
     async def broadcast_to_websockets(self, message: dict):
         """向所有 WebSocket 客户端广播消息"""
         if self.websocket_clients:
-            disconnected = set()
+            disconnected = []
             for websocket in self.websocket_clients:
                 try:
                     await websocket.send_text(json.dumps(message))
                 except:
-                    disconnected.add(websocket)
+                    disconnected.append(websocket)
             
             # 移除断开的连接
             for websocket in disconnected:
-                self.websocket_clients.discard(websocket)
+                if websocket in self.websocket_clients:
+                    self.websocket_clients.remove(websocket)
     
     def disconnect(self):
         """断开 MQTT 连接"""

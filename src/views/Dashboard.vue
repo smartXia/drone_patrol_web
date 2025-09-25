@@ -1650,7 +1650,6 @@ const loadDjiErrorCodes = async () => {
       }
     }
     
-    console.log('加载的DJI错误码数量:', codes.length)
     djiCodes.value = codes
     filteredDjiCodes.value = codes
   } catch (error) {
@@ -1685,8 +1684,6 @@ const loadHmsErrorCodes = async () => {
       }
     }
     
-    console.log('加载的HMS错误码数量:', codes.length)
-    console.log('HMS错误码示例:', codes.slice(0, 3))
     hmsCodes.value = codes
     filteredHmsCodes.value = codes
   } catch (error) {
