@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from '@/views/Dashboard.vue'
 const RedisExplorer = () => import('@/views/RedisExplorer.vue')
 const ErrorCodes = () => import('@/views/ErrorCodes.vue')
+const AircraftDetail = () => import('@/views/AircraftDetail.vue')
+const CameraLive = () => import('@/views/CameraLive.vue')
 
 const routes = [
   {
@@ -26,6 +28,22 @@ const routes = [
     component: ErrorCodes,
     meta: {
       title: 'DJI 错误码查询'
+    }
+  },
+  {
+    path: '/aircraft/:deviceSn',
+    name: 'AircraftDetail',
+    component: AircraftDetail,
+    meta: {
+      title: '飞机信息详情'
+    }
+  },
+  {
+    path: '/camera',
+    name: 'CameraLive',
+    component: CameraLive,
+    meta: {
+      title: '机场直播摄像头'
     }
   }
 ]

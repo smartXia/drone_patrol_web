@@ -39,6 +39,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { hGetAllPaged, hSet, hDel } from '@/api/redis'
 const props = defineProps({ keyName: String, keyType: String })
 const emit = defineEmits(['rename','expire','persist','refresh'])
@@ -47,7 +48,7 @@ const editing = ref(false)
 
 async function load() {
   const res = await hGetAllPaged(props.keyName, 0, 200)
-  items.value = res.items || []
+  items.value = Object.entries(res).map(([field, value]) => ({ field, value }))
 }
 function addField() {
   items.value.unshift({ field: '', value: '' })

@@ -39,6 +39,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { lRange, lPush, rPush, lPop, rPop, lSet, lRem } from '@/api/redis'
 const props = defineProps({ keyName: String, keyType: String })
 const emit = defineEmits(['rename','expire','persist','refresh'])

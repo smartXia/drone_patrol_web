@@ -1,6 +1,6 @@
 # 大疆无人机设备实时状态监控系统
 
-一个基于 Vue 3 + FastAPI + MQTT 的现代化无人机设备监控平台，支持实时数据接收、设备状态监控、消息管理和 Redis 数据存储。
+一个基于 Vue 3 + Go Gin + MQTT 的现代化无人机设备监控平台，支持实时数据接收、设备状态监控、消息管理和 Redis 数据存储。
 
 ## 📸 系统截图
 
@@ -64,18 +64,18 @@
 - **ECharts** - 数据可视化
 
 ### 后端
-- **FastAPI** - 现代 Python Web 框架
+- **Go 1.23** - 现代编程语言
+- **Gin** - Go Web 框架
 - **SQLite** - 轻量级数据库
 - **Redis** - 内存数据库
 - **Paho MQTT** - MQTT 客户端库
 - **WebSocket** - 实时通信
 
-
 ## 📦 安装和运行
 
 ### 环境要求
 - Node.js 16+
-- Python 3.8+
+- Go 1.23+
 - Redis 服务器
 
 ### 1. 克隆项目
@@ -99,40 +99,38 @@ yarn install
 
 ### 4. 安装后端依赖
 ```bash
-# 创建虚拟环境
-python -m venv .venv
+# 进入Go后端目录
+cd backend-go
 
-# 激活虚拟环境
-# Windows
-.venv\Scripts\activate
-# Linux/Mac
-source .venv/bin/activate
-
-# 安装依赖
-pip install -r backend/requirements.txt
+# 下载Go依赖
+go mod download
 ```
 
 ### 5. 启动服务
 
 #### 开发模式（推荐）
 ```bash
-# 同时启动前端和后端
-npm run dev:full
-```
-
-#### 分别启动
-```bash
 # 启动前端开发服务器
 npm run dev
 
-# 启动后端 API 服务器
-npm run dev:py
+# 启动Go后端服务器
+cd backend-go
+./run.sh  # Linux/Mac
+# 或
+run.bat   # Windows
+```
+
+#### Docker 部署
+```bash
+# 使用Docker Compose启动
+cd backend-go
+docker-compose up --build
 ```
 
 ### 6. 访问应用
 - 前端地址：http://localhost:5173
-- 后端 API：http://localhost:8080
-- API 文档：http://localhost:8080/docs
+- 后端 API：http://localhost:18080
+- API 文档：http://localhost:18080/api/health
 
 ## 🚀 构建和部署
 
@@ -141,18 +139,34 @@ npm run dev:py
 npm run build
 ```
 
+### 构建Go后端
+```bash
+cd backend-go
+go build -o drone-patrol-backend main.go
+```
 
+### Docker 部署
+```bash
+cd backend-go
+docker-compose up --build -d
+```
 
 ## 📁 项目结构
 
 ```
 drone-patrol-web/
-├── backend/                 # 后端服务
-│   ├── app/
-│   │   └── main.py         # FastAPI 主应用
-│   ├── data/
-│   │   └── backend.db      # SQLite 数据库
-│   └── requirements.txt    # Python 依赖
+├── backend-go/              # Go后端服务
+│   ├── internal/           # 内部包
+│   │   ├── config/         # 配置管理
+│   │   ├── database/       # 数据库层
+│   │   ├── handlers/       # HTTP处理器
+│   │   ├── middleware/     # 中间件
+│   │   ├── models/         # 数据模型
+│   │   └── services/       # 业务逻辑
+│   ├── main.go             # Go主应用
+│   ├── go.mod              # Go模块文件
+│   ├── Dockerfile          # Docker配置
+│   └── docker-compose.yml  # Docker编排
 ├── src/                    # 前端源码
 │   ├── components/         # Vue 组件
 │   │   ├── mqtt/          # MQTT 相关组件
@@ -163,16 +177,9 @@ drone-patrol-web/
 │   └── utils/             # 工具函数
 ├── docs/                  # 项目文档
 │   └── screenshots/       # 系统截图
-│       ├── main-dashboard.png
-│       ├── mqtt-connection.png
-│       ├── device-status.png
-│       ├── redis-explorer.png
-│       ├── message-dialog.png
-│       └── error-codes.png
 ├── public/                # 静态资源
 └── dist/                  # 构建输出
 ```
-
 
 ## 🔧 配置说明
 
@@ -276,7 +283,7 @@ cp env.example .env
 感谢以下开源项目的支持：
 - Vue.js
 - Element Plus
-- FastAPI
+- Go Gin
 - Redis
 - MQTT.js
 
@@ -295,7 +302,6 @@ cp env.example .env
 - [ ] `redis-explorer.png` - Redis 数据管理
 - [ ] `message-dialog.png` - 消息详情对话框
 - [ ] `error-codes.png` - 错误码查询
-
 
 ---
 

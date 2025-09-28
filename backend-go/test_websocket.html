@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+    <h1>WebSocket Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+    
+    <script>
+        const status = document.getElementById('status');
+        const messages = document.getElementById('messages');
+        
+        const ws = new WebSocket('ws://127.0.0.1:18080/ws/mqtt');
+        
+        ws.onopen = function(event) {
+            status.textContent = 'Connected!';
+            status.style.color = 'green';
+            messages.innerHTML += '<div>WebSocket connected successfully</div>';
+            
+            // Send a test message
+            ws.send(JSON.stringify({
+                type: 'test',
+                message: 'Hello from client'
+            }));
+        };
+        
+        ws.onmessage = function(event) {
+            messages.innerHTML += '<div>Received: ' + event.data + '</div>';
+        };
+        
+        ws.onerror = function(error) {
+            status.textContent = 'Error: ' + error;
+            status.style.color = 'red';
+            messages.innerHTML += '<div>WebSocket error: ' + error + '</div>';
+        };
+        
+        ws.onclose = function(event) {
+            status.textContent = 'Disconnected: ' + event.code + ' - ' + event.reason;
+            status.style.color = 'orange';
+            messages.innerHTML += '<div>WebSocket closed: ' + event.code + ' - ' + event.reason + '</div>';
+        };
+    </script>
+</body>
+</html>

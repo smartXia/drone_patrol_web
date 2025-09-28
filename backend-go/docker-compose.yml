@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  drone-patrol-backend:
+    build: .
+    ports:
+      - "18080:18080"
+    environment:
+      - PORT=18080
+      - DATABASE_PATH=/app/data/backend.db
+      - ENV=production
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:18080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

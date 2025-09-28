@@ -344,7 +344,7 @@ export const useMqttStore = defineStore('mqtt', () => {
       
       // 解析主题获取设备ID
       const topicParts = topic.split('/')
-      // 对于 thing/product/8UUXN2B00A00ST/events 格式，设备ID是第3部分
+      // 对于 thing/product/{device_sn}/events 格式，设备ID是第3部分
       const deviceId = topicParts[2] || topicParts[1] || 'unknown'
       console.log('解析的设备ID:', deviceId)
       console.log('主题分割结果:', topicParts)

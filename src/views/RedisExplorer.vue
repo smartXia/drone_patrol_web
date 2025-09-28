@@ -51,18 +51,25 @@
             />
           </el-col>
           <el-col :span="18" style="height: 100%;">
-            <component
-              :is="currentDetailComponent"
-              v-if="selectedKey"
-              :key="selectedKey + ':' + selectedType"
-              :keyName="selectedKey"
-              :keyType="selectedType"
-              @rename="handleRenameKey"
-              @expire="handleExpireKey"
-              @persist="handlePersistKey"
-              @delete="handleDeleteKey"
-              @refresh="handleRefreshKey"
-            />
+            <div v-if="selectedKey" style="height: 100%; display: flex; flex-direction: column;">
+              <!-- 键元数据信息 -->
+              <key-metadata :keyName="selectedKey" />
+              
+              <!-- 键值详情 -->
+              <div style="flex: 1; overflow: hidden;">
+                <component
+                  :is="currentDetailComponent"
+                  :key="selectedKey + ':' + selectedType"
+                  :keyName="selectedKey"
+                  :keyType="selectedType"
+                  @rename="handleRenameKey"
+                  @expire="handleExpireKey"
+                  @persist="handlePersistKey"
+                  @delete="handleDeleteKey"
+                  @refresh="handleRefreshKey"
+                />
+              </div>
+            </div>
             <el-empty v-else description="请选择一个键以查看详情" />
           </el-col>
         </el-row>
@@ -79,6 +86,7 @@ import ConnectionList from '@/components/redis/ConnectionList.vue'
 import KeySearchBar from '@/components/redis/KeySearchBar.vue'
 import KeyList from '@/components/redis/KeyList.vue'
 import KeyTree from '@/components/redis/KeyTree.vue'
+import KeyMetadata from '@/components/redis/KeyMetadata.vue'
 import KeyDetailString from '@/components/redis/KeyDetailString.vue'
 import KeyDetailHash from '@/components/redis/KeyDetailHash.vue'
 import KeyDetailList from '@/components/redis/KeyDetailList.vue'

@@ -8,6 +8,10 @@ export const config = {
   env: import.meta.env.VITE_ENV || 'development',
   devMode: import.meta.env.VITE_DEV_MODE === 'true' || import.meta.env.DEV,
   
+  // 设备配置
+  deviceSn: import.meta.env.VITE_DEVICE_SN || '8UUXN2B00A00ST',
+  gatewaySn: import.meta.env.VITE_GATEWAY_SN || '8UUXN2B00A00ST',
+  
   // 超时配置
   timeout: 15000,
   
@@ -20,3 +24,5 @@ export const config = {
 export const API_BASE_URL = config.apiBaseUrl
 export const WS_BASE_URL = config.wsBaseUrl
 export const TIMEOUT = config.timeout
+export const DEVICE_SN = config.deviceSn
+export const GATEWAY_SN = config.gatewaySn

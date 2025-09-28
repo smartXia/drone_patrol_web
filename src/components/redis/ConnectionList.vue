@@ -5,7 +5,7 @@
       <el-button type="primary" size="small" @click="openEdit()">新建</el-button>
     </div>
     <el-scrollbar height="calc(100% - 40px)">
-      <el-list class="conn-list">
+      <div class="conn-list">
         <div
           v-for="p in profiles"
           :key="p.id"
@@ -27,7 +27,7 @@
             </div>
           </div>
         </div>
-      </el-list>
+      </div>
     </el-scrollbar>
 
     <el-dialog v-model="editVisible" title="连接配置" width="520">

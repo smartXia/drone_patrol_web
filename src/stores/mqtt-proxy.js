@@ -31,6 +31,15 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
     return Object.keys(deviceStatus.value).length
   })
 
+  // 当前MQTT配置名称
+  const currentMQTTProfileName = computed(() => {
+    if (currentProfileId.value && profiles.value.length > 0) {
+      const profile = profiles.value.find(p => p.id === currentProfileId.value)
+      return profile ? profile.name : '默认配置'
+    }
+    return '默认配置'
+  })
+
   // 默认配置
   const defaultConfig = {
     protocol: 'tcp',
@@ -593,6 +602,7 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
     // 计算属性
     connectionStatus,
     visibleDeviceCount,
+    currentMQTTProfileName,
     
     // 连接方法
     connect,

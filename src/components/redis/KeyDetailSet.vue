@@ -32,6 +32,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { sScan, sAdd, sRem } from '@/api/redis'
 const props = defineProps({ keyName: String, keyType: String })
 const emit = defineEmits(['rename','expire','persist','refresh'])
@@ -43,7 +44,7 @@ const sCursor = ref('0')
 async function load() {
   const res = await sScan(props.keyName, sCursor.value, undefined, 200)
   sCursor.value = res.cursor
-  items.value = res.items || []
+  items.value = res.members.map(member => ({ member }))
 }
 async function sadd() { await sAdd(props.keyName, member.value); member.value=''; await load(); emit('refresh') }
 async function srem(row) { await sRem(props.keyName, row.member); await load(); emit('refresh') }

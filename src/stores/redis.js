@@ -22,6 +22,22 @@ export const useRedisStore = defineStore('redis', () => {
     // 从 localStorage 读取 profiles
     const raw = localStorage.getItem('redis_profiles')
     profiles.value = raw ? JSON.parse(raw) : []
+    
+    // 如果没有配置，添加默认配置
+    if (profiles.value.length === 0) {
+      profiles.value = [
+        {
+          id: 'default_redis',
+          name: '本地Redis',
+          host: '127.0.0.1',
+          port: 6379,
+          db: 0,
+          password: ''
+        }
+      ]
+      persistProfiles()
+    }
+    
     const last = localStorage.getItem('redis_current_profile_id')
     currentProfileId.value = last || (profiles.value[0]?.id || null)
   }
@@ -59,7 +75,7 @@ export const useRedisStore = defineStore('redis', () => {
       if (!prof) return
       const { host, port, db, password } = prof
       const res = await api.testConnect({ host, port, db, password })
-      if (res?.ok) {
+      if (res?.code === 0) {
         api.setConnection({ host, port, db, password })
         connected.value = true
         currentProfileId.value = id
@@ -98,8 +114,8 @@ export const useRedisStore = defineStore('redis', () => {
     scanning.value = true
     try {
       const res = await api.scan({ cursor: cursor.value, match: pattern.value || undefined, count: 100, type: typeFilter.value || undefined })
-      cursor.value = res.cursor
-      const mapped = res.keys
+      cursor.value = res.data.cursor
+      const mapped = res.data.keys
       keys.value = keys.value.concat(mapped)
       hasMore.value = cursor.value !== '0'
     } finally {
