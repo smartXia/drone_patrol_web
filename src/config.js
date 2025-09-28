@@ -1,8 +1,8 @@
 // 应用配置文件
 export const config = {
   // 后端 API 配置
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:18080',
-  wsBaseUrl: import.meta.env.VITE_WS_BASE_URL || 'ws://127.0.0.1:18080',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://180.102.24.183:18080',
+  wsBaseUrl: import.meta.env.VITE_WS_BASE_URL || 'ws://180.102.24.183:18080',
   
   // 环境配置
   env: import.meta.env.VITE_ENV || 'development',
