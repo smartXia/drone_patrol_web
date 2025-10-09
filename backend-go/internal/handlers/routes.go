@@ -55,6 +55,7 @@ func (h *Handlers) RegisterRoutes(r *gin.Engine) {
 	redis := r.Group("/api/redis")
 	{
 		redis.POST("/connect/test", h.TestRedisConnection)
+		redis.POST("/command", h.ExecuteRedisCommand)
 	}
 
 	// Redis操作API (兼容原有路径)

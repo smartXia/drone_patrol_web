@@ -1,44 +1,90 @@
 #!/bin/bash
+#这里可替换为你自己的执行程序，其他代码无需更改
+CMS_NAME=drone-patrol-backend
 
-# 无人机监控系统 Go后端启动脚本
+# 创建日志目录
+mkdir -p ./logs
 
-echo "启动无人机监控系统 Go后端..."
-
-# 检查Go是否安装
-if ! command -v go &> /dev/null; then
-    echo "错误: Go未安装，请先安装Go 1.21+"
+# 检查可执行文件是否存在
+if [ ! -f "./drone-patrol-backend" ]; then
+    echo "Error: drone-patrol-backend executable not found!"
+    echo "Please build the project first with: go build -o drone-patrol-backend"
     exit 1
 fi
 
-# 检查Go版本
-GO_VERSION=$(go version | cut -d' ' -f3 | cut -d'o' -f2)
-REQUIRED_VERSION="1.21"
-if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$GO_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
-    echo "错误: Go版本过低，需要1.21+，当前版本: $GO_VERSION"
-    exit 1
-fi
+chmod 777 drone-patrol-backend
+#使用说明，用来提示输入参数
+usage() {
+ echo "Usage: sh rundev.sh [start|stop|restart|status]"
+ exit 1
+}
 
-# 设置环境变量
-export PORT=${PORT:-18080}
-export DATABASE_PATH=${DATABASE_PATH:-./data/backend.db}
-export ENV=${ENV:-development}
+#检查程序是否在运行
+is_exist(){
+ # shellcheck disable=SC2006
+ # shellcheck disable=SC2009
+ pid=`ps -ef|grep drone-patrol-backend|grep -v grep|awk '{print $2}' `
+ #如果不存在返回1，存在返回0
+ if [ -z "${pid}" ]; then
+ return 1
+ else
+ return 0
+ fi
+}
 
-echo "环境配置:"
-echo "  端口: $PORT"
-echo "  数据库: $DATABASE_PATH"
-echo "  环境: $ENV"
+#启动方法
+start(){
+ is_exist
+ if [ $? -eq "0" ]; then
+ echo "${CMS_NAME} is already running. pid=${pid} ."
+ else
 
-# 创建数据目录
-mkdir -p data
+ nohup ./$CMS_NAME > ./logs/backend.log 2>&1 &
+ echo "${CMS_NAME} start success"
+ fi
+}
 
-# 下载依赖
-echo "下载依赖..."
-go mod download
+#停止方法
+stop(){
+ is_exist
+ if [ $? -eq "0" ]; then
+ kill -9 $pid
+ else
+ echo "${CMS_NAME} is not running"
+ fi
+}
 
-# 构建应用
-echo "构建应用..."
-go build -o drone-patrol-backend main.go
+#输出运行状态
+status(){
+ is_exist
+ if [ $? -eq "0" ]; then
+ echo "${CMS_NAME} is running. Pid is ${pid}"
+ else
+ echo "${CMS_NAME} is NOT running."
+ fi
+}
 
-# 启动应用
-echo "启动应用..."
-./drone-patrol-backend
+#重启
+restart(){
+ stop
+ start
+}
+
+#根据输入参数，选择执行对应方法，不输入则执行使用说明
+case "$1" in
+ "start")
+ start
+ ;;
+ "stop")
+ stop
+ ;;
+ "status")
+ status
+ ;;
+ "restart")
+ restart
+ ;;
+ *)
+ usage
+ ;;
+esac

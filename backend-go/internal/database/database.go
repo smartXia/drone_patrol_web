@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -60,6 +61,7 @@ func createTables(db *sql.DB) error {
 		sn TEXT UNIQUE NOT NULL,
 		type TEXT NOT NULL DEFAULT 'drone',
 		status TEXT NOT NULL DEFAULT 'offline',
+		airport_sn TEXT DEFAULT '',
 		last_seen INTEGER,
 		created_at INTEGER NOT NULL,
 		updated_at INTEGER NOT NULL,
@@ -70,6 +72,7 @@ func createTables(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status);
 	CREATE INDEX IF NOT EXISTS idx_devices_current ON devices(is_current);
 	CREATE INDEX IF NOT EXISTS idx_devices_gateway ON devices(is_gateway);
+	CREATE INDEX IF NOT EXISTS idx_devices_airport_sn ON devices(airport_sn);
 	`
 
 	// 执行创建表语句
@@ -81,6 +84,41 @@ func createTables(db *sql.DB) error {
 		return err
 	}
 
+	// 检查并添加 airport_sn 字段到现有表
+	if err := addAirportSnColumnIfNotExists(db); err != nil {
+		log.Printf("Airport SN column migration failed: %v", err)
+		return err
+	}
+
 	log.Println("Database tables created successfully")
+	return nil
+}
+
+// 检查并添加 airport_sn 列（如果不存在）
+func addAirportSnColumnIfNotExists(db *sql.DB) error {
+	// 检查列是否已存在
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('devices') WHERE name='airport_sn'").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("检查列是否存在失败: %v", err)
+	}
+
+	// 如果列不存在，则添加
+	if count == 0 {
+		log.Println("添加 airport_sn 列到 devices 表")
+		_, err := db.Exec("ALTER TABLE devices ADD COLUMN airport_sn TEXT DEFAULT ''")
+		if err != nil {
+			return fmt.Errorf("添加 airport_sn 列失败: %v", err)
+		}
+	} else {
+		log.Println("airport_sn 列已存在，跳过添加")
+	}
+
+	// 创建索引（如果不存在）
+	_, err = db.Exec("CREATE INDEX IF NOT EXISTS idx_devices_airport_sn ON devices(airport_sn)")
+	if err != nil {
+		return fmt.Errorf("创建 airport_sn 索引失败: %v", err)
+	}
+
 	return nil
 }

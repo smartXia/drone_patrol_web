@@ -558,3 +558,22 @@ func (h *Handlers) ZSetZIncrBy(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, response)
 }
+
+// 执行Redis命令
+func (h *Handlers) ExecuteRedisCommand(c *gin.Context) {
+	var payload models.RedisCommandPayload
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, models.APIResponse{
+			Code:    1,
+			Message: "参数错误: " + err.Error(),
+		})
+		return
+	}
+
+	response, err := h.redisService.ExecuteCommand(&payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response)
+		return
+	}
+	c.JSON(http.StatusOK, response)
+}

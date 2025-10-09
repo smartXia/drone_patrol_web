@@ -31,6 +31,7 @@ type Device struct {
 	SN        string     `json:"sn" db:"sn"`
 	Type      string     `json:"type" db:"type"`
 	Status    string     `json:"status" db:"status"`
+	AirportSN string     `json:"airport_sn" db:"airport_sn"`
 	LastSeen  *time.Time `json:"lastSeen" db:"last_seen"`
 	CreatedAt int64      `json:"createdAt" db:"created_at"`
 	UpdatedAt int64      `json:"updatedAt" db:"updated_at"`
@@ -39,17 +40,19 @@ type Device struct {
 }
 
 type DevicePayload struct {
-	Name   string `json:"name" binding:"required"`
-	SN     string `json:"sn" binding:"required"`
-	Type   string `json:"type"`
-	Status string `json:"status"`
+	Name      string `json:"name" binding:"required"`
+	SN        string `json:"sn" binding:"required"`
+	Type      string `json:"type"`
+	Status    string `json:"status"`
+	AirportSN string `json:"airport_sn"`
 }
 
 type DeviceUpdatePayload struct {
-	Name   *string `json:"name,omitempty"`
-	SN     *string `json:"sn,omitempty"`
-	Type   *string `json:"type,omitempty"`
-	Status *string `json:"status,omitempty"`
+	Name      *string `json:"name,omitempty"`
+	SN        *string `json:"sn,omitempty"`
+	Type      *string `json:"type,omitempty"`
+	Status    *string `json:"status,omitempty"`
+	AirportSN *string `json:"airport_sn,omitempty"`
 }
 
 // 错误码相关
@@ -105,6 +108,11 @@ type RedisZSetPayload struct {
 	Score  float64 `json:"score,omitempty"`
 	Min    string  `json:"min,omitempty"`
 	Max    string  `json:"max,omitempty"`
+}
+
+// Redis命令执行
+type RedisCommandPayload struct {
+	Command string `json:"command" binding:"required"`
 }
 
 // 网络测试

@@ -30,3 +30,4 @@ Thumbs.db
 # Package manager lock (prefer yarn)
 package-lock.json
 
+backend-go/drone-patrol-backend_linux_amd64

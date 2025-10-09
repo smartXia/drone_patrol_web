@@ -51,26 +51,36 @@
             />
           </el-col>
           <el-col :span="18" style="height: 100%;">
-            <div v-if="selectedKey" style="height: 100%; display: flex; flex-direction: column;">
-              <!-- 键元数据信息 -->
-              <key-metadata :keyName="selectedKey" />
+            <el-tabs v-model="activeTab" style="height: 100%;" class="redis-tabs">
+              <!-- 键详情标签页 -->
+              <el-tab-pane label="键详情" name="key-detail">
+                <div v-if="selectedKey" style="height: 100%; display: flex; flex-direction: column;">
+                  <!-- 键元数据信息 -->
+                  <key-metadata :keyName="selectedKey" />
+                  
+                  <!-- 键值详情 -->
+                  <div style="flex: 1; overflow: hidden;">
+                    <component
+                      :is="currentDetailComponent"
+                      :key="selectedKey + ':' + selectedType"
+                      :keyName="selectedKey"
+                      :keyType="selectedType"
+                      @rename="handleRenameKey"
+                      @expire="handleExpireKey"
+                      @persist="handlePersistKey"
+                      @delete="handleDeleteKey"
+                      @refresh="handleRefreshKey"
+                    />
+                  </div>
+                </div>
+                <el-empty v-else description="请选择一个键以查看详情" />
+              </el-tab-pane>
               
-              <!-- 键值详情 -->
-              <div style="flex: 1; overflow: hidden;">
-                <component
-                  :is="currentDetailComponent"
-                  :key="selectedKey + ':' + selectedType"
-                  :keyName="selectedKey"
-                  :keyType="selectedType"
-                  @rename="handleRenameKey"
-                  @expire="handleExpireKey"
-                  @persist="handlePersistKey"
-                  @delete="handleDeleteKey"
-                  @refresh="handleRefreshKey"
-                />
-              </div>
-            </div>
-            <el-empty v-else description="请选择一个键以查看详情" />
+              <!-- Redis命令执行标签页 -->
+              <el-tab-pane label="命令执行" name="command-exec">
+                <redis-command-executor />
+              </el-tab-pane>
+            </el-tabs>
           </el-col>
         </el-row>
       </el-main>
@@ -92,12 +102,16 @@ import KeyDetailHash from '@/components/redis/KeyDetailHash.vue'
 import KeyDetailList from '@/components/redis/KeyDetailList.vue'
 import KeyDetailSet from '@/components/redis/KeyDetailSet.vue'
 import KeyDetailZSet from '@/components/redis/KeyDetailZSet.vue'
+import RedisCommandExecutor from '@/components/redis/RedisCommandExecutor.vue'
 
 const store = useRedisStore()
 const router = useRouter()
 
 // 侧边栏折叠状态
 const sidebarCollapsed = ref(false)
+
+// 当前活动标签页
+const activeTab = ref('key-detail')
 
 const profiles = computed(() => store.profiles)
 const currentProfileId = computed(() => store.currentProfileId)

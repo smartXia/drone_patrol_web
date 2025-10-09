@@ -887,6 +887,83 @@ func (s *RedisService) ZSetZIncrBy(payload *models.RedisZSetPayload) (*models.AP
 	}, nil
 }
 
+// 执行Redis命令
+func (s *RedisService) ExecuteCommand(payload *models.RedisCommandPayload) (*models.APIResponse, error) {
+	client := s.getClient()
+	if client == nil {
+		return &models.APIResponse{
+			Code:    1,
+			Message: "Redis客户端未初始化",
+		}, nil
+	}
+
+	ctx := context.Background()
+
+	// 解析命令
+	args := parseCommand(payload.Command)
+	if len(args) == 0 {
+		return &models.APIResponse{
+			Code:    1,
+			Message: "无效的命令",
+		}, nil
+	}
+
+	// 执行命令
+	cmd := client.Do(ctx, args...)
+	result, err := cmd.Result()
+	if err != nil {
+		return &models.APIResponse{
+			Code:    1,
+			Message: fmt.Sprintf("命令执行失败: %v", err),
+		}, err
+	}
+
+	return &models.APIResponse{
+		Code:    0,
+		Message: "命令执行成功",
+		Data: map[string]interface{}{
+			"command": payload.Command,
+			"result":  result,
+		},
+	}, nil
+}
+
+// 解析命令字符串
+func parseCommand(command string) []interface{} {
+	var args []interface{}
+	var current string
+	var inQuotes bool
+	var quoteChar rune
+
+	for _, char := range command {
+		if char == '"' || char == '\'' {
+			if !inQuotes {
+				inQuotes = true
+				quoteChar = char
+			} else if char == quoteChar {
+				inQuotes = false
+				args = append(args, current)
+				current = ""
+			} else {
+				current += string(char)
+			}
+		} else if char == ' ' && !inQuotes {
+			if current != "" {
+				args = append(args, current)
+				current = ""
+			}
+		} else {
+			current += string(char)
+		}
+	}
+
+	if current != "" {
+		args = append(args, current)
+	}
+
+	return args
+}
+
 // 获取Redis客户端
 func (s *RedisService) getClient() *redis.Client {
 	return s.client

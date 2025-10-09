@@ -22,7 +22,7 @@ func NewDeviceService(db *database.DB) *DeviceService {
 
 // 获取设备列表
 func (s *DeviceService) GetDevices() (*models.APIResponse, error) {
-	query := `SELECT id, name, sn, type, status, last_seen, created_at, updated_at, is_current, is_gateway 
+	query := `SELECT id, name, sn, type, status, airport_sn, last_seen, created_at, updated_at, is_current, is_gateway 
 			  FROM devices ORDER BY is_current DESC, created_at DESC`
 
 	rows, err := s.db.Query(query)
@@ -40,7 +40,7 @@ func (s *DeviceService) GetDevices() (*models.APIResponse, error) {
 		var lastSeen sql.NullInt64
 
 		err := rows.Scan(
-			&device.ID, &device.Name, &device.SN, &device.Type, &device.Status,
+			&device.ID, &device.Name, &device.SN, &device.Type, &device.Status, &device.AirportSN,
 			&lastSeen, &device.CreatedAt, &device.UpdatedAt, &device.IsCurrent, &device.IsGateway,
 		)
 		if err != nil {
@@ -68,14 +68,14 @@ func (s *DeviceService) GetDevices() (*models.APIResponse, error) {
 // 获取当前设备信息
 func (s *DeviceService) GetCurrentDevices() (*models.APIResponse, error) {
 	// 获取当前设备
-	currentDeviceQuery := `SELECT id, name, sn, type, status, last_seen FROM devices WHERE is_current = 1`
+	currentDeviceQuery := `SELECT id, name, sn, type, status, airport_sn, last_seen FROM devices WHERE is_current = 1`
 	var currentDevice *models.Device
 
 	row := s.db.QueryRow(currentDeviceQuery)
 	var device models.Device
 	var lastSeen sql.NullInt64
 
-	err := row.Scan(&device.ID, &device.Name, &device.SN, &device.Type, &device.Status, &lastSeen)
+	err := row.Scan(&device.ID, &device.Name, &device.SN, &device.Type, &device.Status, &device.AirportSN, &lastSeen)
 	if err == nil {
 		if lastSeen.Valid {
 			t := time.Unix(lastSeen.Int64/1000, (lastSeen.Int64%1000)*1000000)
@@ -90,14 +90,14 @@ func (s *DeviceService) GetCurrentDevices() (*models.APIResponse, error) {
 	}
 
 	// 获取当前网关
-	currentGatewayQuery := `SELECT id, name, sn, type, status, last_seen FROM devices WHERE is_gateway = 1`
+	currentGatewayQuery := `SELECT id, name, sn, type, status, airport_sn, last_seen FROM devices WHERE is_gateway = 1`
 	var currentGateway *models.Device
 
 	row = s.db.QueryRow(currentGatewayQuery)
 	var gateway models.Device
 	var gatewayLastSeen sql.NullInt64
 
-	err = row.Scan(&gateway.ID, &gateway.Name, &gateway.SN, &gateway.Type, &gateway.Status, &gatewayLastSeen)
+	err = row.Scan(&gateway.ID, &gateway.Name, &gateway.SN, &gateway.Type, &gateway.Status, &gateway.AirportSN, &gatewayLastSeen)
 	if err == nil {
 		if gatewayLastSeen.Valid {
 			t := time.Unix(gatewayLastSeen.Int64/1000, (gatewayLastSeen.Int64%1000)*1000000)
@@ -147,10 +147,10 @@ func (s *DeviceService) CreateDevice(payload *models.DevicePayload) (*models.API
 	deviceID := uuid.New().String()
 	currentTime := time.Now().UnixMilli()
 
-	query := `INSERT INTO devices (id, name, sn, type, status, last_seen, created_at, updated_at, is_current, is_gateway)
-			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`
+	query := `INSERT INTO devices (id, name, sn, type, status, airport_sn, last_seen, created_at, updated_at, is_current, is_gateway)
+			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`
 
-	_, err = s.db.Exec(query, deviceID, payload.Name, payload.SN, payload.Type, payload.Status, nil, currentTime, currentTime)
+	_, err = s.db.Exec(query, deviceID, payload.Name, payload.SN, payload.Type, payload.Status, payload.AirportSN, nil, currentTime, currentTime)
 	if err != nil {
 		return &models.APIResponse{
 			Code:    1,
@@ -186,6 +186,10 @@ func (s *DeviceService) UpdateDevice(deviceID string, payload *models.DeviceUpda
 	if payload.Status != nil {
 		setParts = append(setParts, "status = ?")
 		args = append(args, *payload.Status)
+	}
+	if payload.AirportSN != nil {
+		setParts = append(setParts, "airport_sn = ?")
+		args = append(args, *payload.AirportSN)
 	}
 
 	if len(setParts) == 0 {

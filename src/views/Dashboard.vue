@@ -44,38 +44,20 @@
               </div>
             </template>
            
-                     <div class="topic-categories" ref="topicCategoriesRef">
-            <!-- 动态渲染主题分类 -->
-            <div 
-              v-for="category in orderedTopicCategories" 
-              :key="category.key"
-              class="topic-category" 
-              draggable="true"
-              @dragstart="handleDragStart($event, category.key)"
-              @dragover.prevent
-              @drop="handleDrop($event, category.key)"
-              @dragenter.prevent
-              @dragleave="handleDragLeave"
-              @dragend="handleDragEnd"
-            >
-              <div class="category-header">
-                <h4>{{ category.name }}</h4>
-                <el-icon class="drag-handle"><Rank /></el-icon>
-              </div>
-              <div class="topic-item" v-for="(topic, index) in category.data" :key="`${category.key}-${index}`">
-                <el-button 
-                  type="primary" 
-                  size="small"
-                  :disabled="!mqttProxyStore.isConnected || subscribedTopics.includes(topic.topic)"
-                  @click="subscribeTopic(topic.topic)"
-                  style="margin-right: 12px; flex-shrink: 0; font-size: 10px; padding: 4px 8px;"
-                >
-                  {{ subscribedTopics.includes(topic.topic) ? '已订阅' : '订阅' }}
-                </el-button>
-                <div class="topic-info" style="flex: 1;">
-                  <div class="topic-name">{{ topic.name }}</div>
-                  <div class="topic-path">{{ formatTopicPath(topic.topic) }}</div>
-                </div>
+                     <div class="topic-list" ref="topicCategoriesRef">
+            <!-- 所有主题统一显示 -->
+            <div class="topic-item" v-for="(topic, index) in allTopics" :key="`topic-${index}`">
+              <el-button 
+                :type="subscribedTopics.includes(topic.topic) ? 'success' : 'primary'"
+                size="small"
+                :disabled="!mqttProxyStore.isConnected"
+                @click="subscribedTopics.includes(topic.topic) ? unsubscribeTopic(topic.topic) : subscribeTopic(topic.topic)"
+                style="margin-right: 12px; flex-shrink: 0; font-size: 10px; padding: 4px 8px;"
+              >
+                {{ subscribedTopics.includes(topic.topic) ? '已订阅' : '订阅' }}
+              </el-button>
+              <div class="topic-info" style="flex: 1;">
+                <div class="topic-path">{{ formatTopicPath(topic.topic) }}</div>
               </div>
             </div>
           </div>
@@ -110,6 +92,14 @@
           >
             订阅主题
           </el-button>
+         
+         <el-button 
+           type="warning" 
+           :disabled="!mqttProxyStore.isConnected || subscribedTopics.length === 0"
+           @click="clearAllSubscriptions"
+         >
+           清空订阅
+         </el-button>
          
          <el-button 
            type="danger" 
@@ -826,7 +816,7 @@
 import { ElMessage } from 'element-plus'
 import { useMqttProxyStore } from '@/stores/mqtt-proxy'
 import dayjs from 'dayjs'
-import { Rank, ArrowUp, ArrowDown, ArrowRight, Setting, Search, Monitor, View, VideoCamera } from '@element-plus/icons-vue'
+import { Rank, ArrowUp, ArrowDown, ArrowRight, Setting, Search, Monitor, View, VideoCamera, Document, CopyDocument, Check, Plus } from '@element-plus/icons-vue'
 import { FullScreen } from '@element-plus/icons-vue'
 import '@/styles/dashboard.css'
 import ConnectionManager from '../components/mqtt/ConnectionManager.vue'
@@ -845,45 +835,14 @@ const deviceManagerVisible = ref(false)
  
 const topicInput = ref(`thing/product/${deviceStore.currentDeviceSn || 'DEVICE_SN'}/events`)
 
-// 监听设备变化，更新输入框并重新订阅主题
-watch(() => deviceStore.currentDeviceSn, async (newSn, oldSn) => {
+// 监听设备变化，更新输入框（不再自动重新订阅主题）
+watch(() => deviceStore.currentDeviceSn, (newSn, oldSn) => {
   topicInput.value = `thing/product/${newSn || 'DEVICE_SN'}/events`
   
-  // 如果MQTT已连接且设备SN发生变化，需要重新订阅主题
-  if (mqttProxyStore.isConnected && newSn !== oldSn) {
-    try {
-      // 获取当前已订阅的主题列表
-      const currentSubscribedTopics = Array.from(subscribedTopics.value)
-      
-      // 重新订阅包含设备标识符的主题
-      for (const topic of currentSubscribedTopics) {
-        // 检查是否是包含设备标识符的主题（thing/product/ 或 sys/product/）
-        if ((topic.includes('thing/product/') || topic.includes('sys/product/')) && 
-            (topic.includes('/events') || topic.includes('/services') || topic.includes('/requests') || 
-             topic.includes('/status') || topic.includes('/property') || topic.includes('/drc'))) {
-          // 取消订阅旧主题
-          if (oldSn && topic.includes(oldSn)) {
-            console.log('取消订阅旧主题:', topic)
-            await mqttProxyStore.unsubscribeTopics(topic)
-            subscribedTopics.value.delete(topic)
-          }
-          
-          // 订阅新主题
-          const newTopic = topic.replace(oldSn || 'DEVICE_SN', newSn || 'DEVICE_SN')
-          if (newTopic !== topic) {
-            console.log('重新订阅新主题:', newTopic)
-            await mqttProxyStore.subscribeToTopics(newTopic)
-          }
-        }
-      }
-      
-      if (currentSubscribedTopics.length > 0) {
-        ElMessage.success(`已切换设备，重新订阅了 ${currentSubscribedTopics.length} 个主题`)
-      }
-    } catch (error) {
-      console.error('重新订阅主题失败:', error)
-      ElMessage.error('重新订阅主题失败: ' + error.message)
-    }
+  // 设备切换时不再自动重新订阅主题
+  // 用户需要手动订阅新设备的主题
+  if (newSn !== oldSn && oldSn) {
+    console.log('设备已切换，请手动订阅新设备的主题')
   }
 })
  
@@ -1051,105 +1010,98 @@ const handleDeviceManagerClose = (done) => {
     }))
   })
 
+  // 计算属性：所有主题合并到一个数组
+  const allTopics = computed(() => {
+    const topics = []
+    orderedTopicCategories.value.forEach(category => {
+      topics.push(...category.data)
+    })
+    return topics
+  })
+
              // DJI主题定义 - 核心主题
     const deviceOsdTopics = ref([
       {
         name: '设备OSD',
-        topic: 'thing/product/{device_sn}/osd',
-        description: '设备端定频向云平台推送的设备属性（properties）'
+        topic: 'thing/product/{device_sn}/osd'
       },
       {
         name: '设备状态',
-        topic: 'thing/product/{device_sn}/state',
-        description: '设备端按需上报向云平台推送的设备属性（properties）'
+        topic: 'thing/product/{device_sn}/state'
       }
     ])
 
     const deviceServiceTopics = ref([
       {
         name: '服务调用',
-        topic: 'thing/product/{device_sn}/services',
-        description: '云平台向设备发送的服务'
+        topic: 'thing/product/{device_sn}/services'
       },
       {
         name: '服务响应',
-        topic: 'thing/product/{device_sn}/services_reply',
-        description: '设备对service的回复、处理结果'
+        topic: 'thing/product/{device_sn}/services_reply'
       }
     ])
 
     const deviceEventTopics = ref([
       {
         name: '事件通知',
-        topic: 'thing/product/{device_sn}/events',
-        description: '设备端向云平台发送的，需要关注和处理的事件'
+        topic: 'thing/product/{device_sn}/events'
       },
       {
         name: '事件响应',
-        topic: 'thing/product/{device_sn}/events_reply',
-        description: '云平台对设备事件的回复、处理结果'
+        topic: 'thing/product/{device_sn}/events_reply'
       }
     ])
 
     const deviceRequestTopics = ref([
       {
         name: '设备请求',
-        topic: 'thing/product/{device_sn}/requests',
-        description: '设备端向云平台发送请求，为了获取一些信息'
+        topic: 'thing/product/{device_sn}/requests'
       },
       {
         name: '请求响应',
-        topic: 'thing/product/{device_sn}/requests_reply',
-        description: '云平台对设备请求的回复'
+        topic: 'thing/product/{device_sn}/requests_reply'
       }
     ])
 
     const systemStatusTopics = ref([
       {
         name: '系统状态',
-        topic: 'sys/product/{device_sn}/status',
-        description: '设备上下线、更新拓扑'
+        topic: 'sys/product/{device_sn}/status'
       },
       {
         name: '状态响应',
-        topic: 'sys/product/{device_sn}/status_reply',
-        description: '平台响应'
+        topic: 'sys/product/{device_sn}/status_reply'
       }
     ])
 
     const devicePropertyTopics = ref([
       {
         name: '属性设置',
-        topic: 'thing/product/{device_sn}/property/set',
-        description: '设备属性设置'
+        topic: 'thing/product/{device_sn}/property/set'
       },
       {
         name: '属性设置响应',
-        topic: 'thing/product/{device_sn}/property/set_reply',
-        description: '设备属性设置的响应'
+        topic: 'thing/product/{device_sn}/property/set_reply'
       },
       {
         name: '设备定频数据',
-        topic: 'thing/product/{device_sn}/osd',
-        description: '设备推送定频数据，设备将以 0.5HZ 的频率定时上报'
+        topic: 'thing/product/{device_sn}/osd'
       },
       {
         name: '设备状态数据',
-        topic: 'thing/product/{device_sn}/state',
-        description: '设备推送状态数据，设备在状态变化时上报'
+        topic: 'thing/product/{device_sn}/state'
       }
     ])
 
     const deviceDrcTopics = ref([
       {
         name: 'DRC上行',
-        topic: 'thing/product/{device_sn}/drc/up',
-        description: 'DRC协议上行'
+        topic: 'thing/product/{device_sn}/drc/up'
       },
       {
         name: 'DRC下行',
-        topic: 'thing/product/{device_sn}/drc/down',
-        description: 'DRC协议下行'
+        topic: 'thing/product/{device_sn}/drc/down'
       }
     ])
 
@@ -1216,8 +1168,40 @@ const toggleRecording = (topic) => {
 const handleDeviceChange = async (deviceSn) => {
   if (deviceSn) {
     try {
+      // 记录切换前的连接状态和订阅数量
+      const wasConnected = mqttProxyStore.isConnected
+      const previousSubscriptions = Array.from(subscribedTopics.value)
+      
+      // 如果之前已连接MQTT，先取消所有订阅
+      if (wasConnected && previousSubscriptions.length > 0) {
+        try {
+          console.log('设备切换前，取消所有之前的订阅...')
+          for (const topic of previousSubscriptions) {
+            console.log('取消订阅:', topic)
+            await mqttProxyStore.unsubscribeTopics(topic)
+          }
+          ElMessage.info(`已取消 ${previousSubscriptions.length} 个之前的订阅`)
+        } catch (unsubscribeError) {
+          console.error('取消订阅失败:', unsubscribeError)
+          ElMessage.warning('取消部分订阅失败，但继续切换设备')
+        }
+      }
+      
+      // 切换设备
       await deviceStore.setCurrentDevice(deviceSn)
       ElMessage.success(`已切换到设备: ${deviceStore.currentDevice?.name || deviceSn}`)
+      
+      // 如果之前已连接MQTT，自动重新连接
+      if (wasConnected) {
+        try {
+          console.log('设备切换后自动重新连接MQTT...')
+          await mqttProxyStore.connect()
+          ElMessage.success('MQTT已自动重新连接，请手动订阅新设备的主题')
+        } catch (mqttError) {
+          console.error('自动重连MQTT失败:', mqttError)
+          ElMessage.warning('设备切换成功，但MQTT重连失败，请手动连接')
+        }
+      }
     } catch (error) {
       ElMessage.error(`切换设备失败: ${error.message}`)
     }
@@ -1235,6 +1219,28 @@ const handleConnect = async () => {
     ElMessage.success('MQTT连接成功')
   } catch (error) {
     ElMessage.error(`连接失败: ${error.message}`)
+  }
+}
+
+// 清空所有订阅
+const clearAllSubscriptions = async () => {
+  try {
+    const currentSubscriptions = Array.from(subscribedTopics.value)
+    if (currentSubscriptions.length === 0) {
+      ElMessage.info('当前没有订阅任何主题')
+      return
+    }
+    
+    // 取消所有订阅
+    for (const topic of currentSubscriptions) {
+      console.log('取消订阅:', topic)
+      await mqttProxyStore.unsubscribeTopics(topic)
+    }
+    
+    ElMessage.success(`已清空 ${currentSubscriptions.length} 个订阅`)
+  } catch (error) {
+    console.error('清空订阅失败:', error)
+    ElMessage.error(`清空订阅失败: ${error.message}`)
   }
 }
 
@@ -1302,11 +1308,48 @@ const handleConnect = async () => {
               console.log('开始订阅主题:', topic)
               await mqttProxyStore.subscribeToTopics(topic)
               console.log('订阅请求已发送:', topic)
-              // 不在这里添加 recordingTopics，等待后端确认
-              ElMessage.success(`成功订阅主题: ${topic}`)
+              
+              // 等待一下让状态更新
+              await new Promise(resolve => setTimeout(resolve, 100))
+              
+              // 检查订阅是否成功
+              if (subscribedTopics.value.includes(topic)) {
+                ElMessage.success(`成功订阅主题: ${topic}`)
+              } else {
+                ElMessage.warning(`订阅请求已发送，请稍后查看状态: ${topic}`)
+              }
             } catch (error) {
               console.error('订阅失败:', error)
               ElMessage.error(`订阅失败: ${error.message}`)
+            }
+          }
+
+          // 取消订阅指定主题
+          const unsubscribeTopic = async (topic) => {
+            try {
+              console.log('点击取消订阅主题:', topic)
+              
+              if (!subscribedTopics.value.includes(topic)) {
+                ElMessage.warning('该主题未订阅')
+                return
+              }
+              
+              console.log('开始取消订阅主题:', topic)
+              await mqttProxyStore.unsubscribeTopics(topic)
+              console.log('取消订阅请求已发送:', topic)
+              
+              // 等待一下让状态更新
+              await new Promise(resolve => setTimeout(resolve, 100))
+              
+              // 检查取消订阅是否成功
+              if (!subscribedTopics.value.includes(topic)) {
+                ElMessage.success(`成功取消订阅主题: ${topic}`)
+              } else {
+                ElMessage.warning(`取消订阅请求已发送，请稍后查看状态: ${topic}`)
+              }
+            } catch (error) {
+              console.error('取消订阅失败:', error)
+              ElMessage.error(`取消订阅失败: ${error.message}`)
             }
           }
 
@@ -1351,8 +1394,8 @@ const getDeviceStatusText = (device) => {
 // 获取指定主题的消息
 const getTopicMessages = (topic) => {
   const messages = mqttProxyStore.messageHistory.filter(message => message.topic === topic)
-  console.log(`主题 ${topic} 的消息数量:`, messages.length)
-  console.log('所有消息历史:', mqttProxyStore.messageHistory.length)
+  // console.log(`主题 ${topic} 的消息数量:`, messages.length)
+  // console.log('所有消息历史:', mqttProxyStore.messageHistory.length)
   return messages
 }
  
@@ -1710,6 +1753,7 @@ const openAircraftDetail = (deviceSn) => {
 const openCameraLive = () => {
   router.push({ name: 'CameraLive' })
 }
+
 
 const enlargedDeviceVisible = ref(false)
 const enlargedDeviceId = ref('')
@@ -2162,6 +2206,7 @@ onUnmounted(() => {
 
 .device-name {
   font-weight: 500;
+  font-size: 12px;
   color: var(--el-text-color-primary);
 }
 
@@ -2223,6 +2268,7 @@ onUnmounted(() => {
 
 .mqtt-profile-name {
   font-weight: 500;
+  font-size: 12px;
   color: var(--el-text-color-primary);
 }
 
@@ -2598,6 +2644,48 @@ onUnmounted(() => {
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* 主题列表样式 */
+.topic-list {
+  max-height: 1000px;
+  overflow-y: auto;
+}
+
+.topic-count {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-left: 8px;
+}
+
+.empty-topics {
+  padding: 20px;
+  text-align: center;
+}
+
+.topic-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.topic-item:last-child {
+  border-bottom: none;
+}
+
+.topic-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.topic-path {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+  word-break: break-all;
+  line-height: 1.4;
+  font-weight: bold;
 }
 
 /* JSON查看器样式 */

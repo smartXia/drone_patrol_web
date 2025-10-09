@@ -303,7 +303,7 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
 
   // 处理MQTT消息
   const handleMqttMessage = (topic, payload, qos, retain) => {
-    console.log('前端收到MQTT消息:', topic, payload)
+    console.log('前端收到MQTT消息:', topic, payload)  
     const message = {
       id: Date.now() + Math.random(),
       topic,
@@ -315,7 +315,7 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
 
     // 添加到消息历史
     messageHistory.value.unshift(message)
-    console.log('消息历史长度:', messageHistory.value.length)
+    // console.log('消息历史长度:', messageHistory.value.length)
     if (messageHistory.value.length > 1000) {
       messageHistory.value = messageHistory.value.slice(0, 1000)
     }
