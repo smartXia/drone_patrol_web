@@ -51,6 +51,28 @@ func (h *Handlers) RegisterRoutes(r *gin.Engine) {
 		cameras.POST("/:camera_id/stop", h.StopCameraStream)
 	}
 
+	// 腾讯云直播API
+	live := r.Group("/api/live")
+	{
+		live.POST("/stream/create", h.CreateLiveStream)
+		live.GET("/stream/:streamId/status", h.GetLiveStreamStatus)
+		live.POST("/stream/:streamId/stop", h.StopLiveStream)
+	}
+
+	// TRTC房间管理API (已废弃，保留兼容性)
+	trtc := r.Group("/api/trtc")
+	{
+		trtc.POST("/room/create", h.CreateTRTCRoom)
+		trtc.POST("/room/join", h.JoinTRTCRoom)
+	}
+
+	// WHIP WebRTC推流API
+	whip := r.Group("/api/whip")
+	{
+		whip.POST("/stream", h.WhipStream)
+		whip.GET("/auth/:room", h.GetWhipAuth)
+	}
+
 	// Redis代理API
 	redis := r.Group("/api/redis")
 	{

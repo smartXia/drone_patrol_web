@@ -279,23 +279,69 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
         break
         
       case 'subscribe_result':
-        if (message.success) {
-          console.log('订阅成功:', message.topic)
+        // 检查订阅结果，优先使用result返回码判断
+        let subscribeSuccess = false
+        let subscribeResultCode = null
+        
+        // 尝试从不同位置获取result字段
+        if (typeof message.result === 'number') {
+          subscribeResultCode = message.result
+          subscribeSuccess = message.result === 0
+        } else if (message.data && typeof message.data.result === 'number') {
+          subscribeResultCode = message.data.result
+          subscribeSuccess = message.data.result === 0
+        } else if (message.success === true || message.payload === 'success') {
+          // 兼容旧格式
+          subscribeSuccess = true
+          subscribeResultCode = 0
+        } else {
+          // 默认情况下，如果没有明确的失败标识，认为成功
+          subscribeSuccess = true
+          subscribeResultCode = 0
+        }
+        
+        if (subscribeSuccess) {
+          console.log('✅ 订阅成功:', message.topic, subscribeResultCode !== null ? `(result=${subscribeResultCode})` : '')
           subscribedTopics.value.set(message.topic, {
             qos: message.qos || 0,
             timestamp: new Date().toISOString()
           })
           console.log('当前已订阅主题:', Array.from(subscribedTopics.value.keys()))
         } else {
-          console.error('订阅失败:', message.topic)
+          console.error('❌ 订阅失败:', message.topic, subscribeResultCode !== null ? `(result=${subscribeResultCode})` : '')
         }
         break
         
       case 'publish_result':
-        if (message.success) {
-          console.log('发布成功:', message.topic)
+        // 检查发布结果，优先使用result返回码判断
+        let isSuccess = false
+        let resultCode = null
+        
+        // 尝试从不同位置获取result字段
+        if (typeof message.result === 'number') {
+          resultCode = message.result
+          isSuccess = message.result === 0
+        } else if (message.data && typeof message.data.result === 'number') {
+          resultCode = message.data.result
+          isSuccess = message.data.result === 0
+        } else if (message.success === true || message.payload === 'success') {
+          // 兼容旧格式 - payload为'success'表示成功
+          isSuccess = true
+          resultCode = 0
         } else {
-          console.error('发布失败:', message.topic)
+          // 默认情况下，如果没有明确的失败标识，认为成功
+          isSuccess = true
+          resultCode = 0
+        }
+        
+        if (isSuccess) {
+          console.log('✅ 发布成功:', message.topic, resultCode !== null ? `(result=${resultCode})` : '')
+        } else {
+          console.error('❌ 发布失败:', message.topic, resultCode !== null ? `(result=${resultCode})` : '')
+          console.error('发布失败详情:', message)
+          if (message.error) {
+            console.error('发布错误信息:', message.error)
+          }
         }
         break
     }
@@ -303,7 +349,7 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
 
   // 处理MQTT消息
   const handleMqttMessage = (topic, payload, qos, retain) => {
-    console.log('前端收到MQTT消息:', topic, payload)  
+    // console.log('前端收到MQTT消息:', topic, payload)  
     const message = {
       id: Date.now() + Math.random(),
       topic,
@@ -377,7 +423,13 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
 
   // 订阅主题（兼容旧接口）
   const subscribeToTopics = async (topic, qos = 0) => {
+    console.log('=== MQTT订阅请求 ===')
+    console.log('Topic:', topic)
+    console.log('QoS:', qos)
+    console.log('连接状态:', isConnected.value)
+    
     if (!isConnected.value) {
+      console.error('❌ MQTT未连接，无法订阅')
       throw new Error('MQTT未连接')
     }
     
@@ -388,7 +440,7 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
         qos
       }
       
-      console.log('发送订阅请求:', topic)
+      console.log('发送订阅请求:', subscribeMessage)
       websocket.value.send(JSON.stringify(subscribeMessage))
       
       // 等待后端确认订阅成功
@@ -407,10 +459,25 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
           } else if (message.type === 'subscribe_result' && message.topic === topic) {
             clearTimeout(timeout)
             websocket.value.removeEventListener('message', handleMessage)
-            if (message.success) {
-              console.log('订阅确认成功:', topic)
+            
+            // 检查订阅结果，优先使用result返回码判断
+            let confirmSuccess = false
+            if (typeof message.result === 'number') {
+              confirmSuccess = message.result === 0
+            } else if (message.data && typeof message.data.result === 'number') {
+              confirmSuccess = message.data.result === 0
+            } else if (message.success === true || message.payload === 'success') {
+              confirmSuccess = true
+            } else {
+              // 默认情况下，如果没有明确的失败标识，认为成功
+              confirmSuccess = true
+            }
+            
+            if (confirmSuccess) {
+              console.log('✅ 订阅确认成功:', topic)
               resolve()
             } else {
+              console.error('❌ 订阅确认失败:', topic)
               reject(new Error('订阅失败'))
             }
           }
@@ -425,7 +492,17 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
 
   // 发布消息
   const publish = (topic, payload, qos = 0, retain = false) => {
-    if (websocket.value && isConnected.value) {
+    if (!websocket.value) {
+      console.error('WebSocket连接不存在，无法发布消息:', topic)
+      return
+    }
+    
+    if (!isConnected.value) {
+      console.error('MQTT未连接，无法发布消息:', topic)
+      return
+    }
+    
+    try {
       const publishMessage = {
         type: 'publish',
         topic,
@@ -433,7 +510,17 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
         qos,
         retain
       }
+      
+      console.log('准备发布消息:', {
+        topic,
+        payloadLength: payload?.length || 0,
+        qos,
+        retain
+      })
+      
       websocket.value.send(JSON.stringify(publishMessage))
+    } catch (error) {
+      console.error('发布消息时发生错误:', error, 'Topic:', topic)
     }
   }
 
@@ -586,6 +673,93 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
     }
   }
 
+  // ===== DJI 服务调用辅助方法 =====
+  const genId = (prefix = 'id') => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+  /**
+   * 发送 DJI 服务调用
+   * @param {string} gatewaySn 网关SN（机场SN）
+   * @param {string} method 方法名，例如 'fileupload_list'
+   * @param {object} data 负载数据
+   * @param {object} options { qos?: number, retain?: boolean, autoSubscribeReply?: boolean }
+   * @returns {{tid:string,bid:string,topic:string,replyTopic:string,payload:object}}
+   */
+  const sendService = async (gatewaySn, method, data = {}, options = {}) => {
+    if (!isConnected.value) {
+      throw new Error('MQTT未连接')
+    }
+    if (!gatewaySn) {
+      throw new Error('缺少 gatewaySn')
+    }
+    const qos = options.qos ?? 0
+    const retain = options.retain ?? false
+    const autoSubscribeReply = options.autoSubscribeReply ?? true
+
+    const topic = `thing/product/${gatewaySn}/services`
+    const replyTopic = `thing/product/${gatewaySn}/services_reply`
+    const tid = genId('tid')
+    const bid = genId('bid')
+    const payload = {
+      tid,
+      bid,
+      timestamp: Date.now(),
+      method,
+      data
+    }
+
+    if (autoSubscribeReply) {
+      try { 
+        await subscribeToTopics(replyTopic, qos)
+        console.log('已订阅回复Topic:', replyTopic)
+      } catch (error) { 
+        console.error('订阅回复Topic失败:', replyTopic, error)
+      }
+    }
+
+    console.log('发送服务调用:', {
+      method,
+      topic,
+      replyTopic,
+      tid,
+      bid,
+      dataKeys: Object.keys(data)
+    })
+
+    publish(topic, JSON.stringify(payload), qos, retain)
+    return { tid, bid, topic, replyTopic, payload }
+  }
+
+  /**
+   * 获取设备可上传的文件列表（fileupload_list）
+   * @param {string} gatewaySn 网关SN（机场SN）
+   * @param {Array<string|number>} moduleList 模块过滤列表，如 ['0','3'] 或 [0,3]
+   * @param {object} options 见 sendService
+   */
+  const requestFileUploadList = async (gatewaySn, moduleList = [], options = {}) => {
+    const modules = Array.isArray(moduleList) ? moduleList.map(v => String(v)) : []
+    return await sendService(gatewaySn, 'fileupload_list', { module_list: modules }, options)
+  }
+
+  /**
+   * 请求文件上传开始
+   * @param {string} gatewaySn 网关SN
+   * @param {object} uploadData 上传数据
+   * @param {object} options 见 sendService
+   */
+  const requestFileUploadStart = async (gatewaySn, uploadData, options = {}) => {
+    return await sendService(gatewaySn, 'fileupload_start', uploadData, options)
+  }
+
+  /**
+   * 请求文件上传状态更新
+   * @param {string} gatewaySn 网关SN
+   * @param {object} statusData 状态数据
+   * @param {object} options 见 sendService
+   */
+  const requestFileUploadUpdate = async (gatewaySn, statusData, options = {}) => {
+    return await sendService(gatewaySn, 'fileupload_update', statusData, options)
+  }
+
   return {
     // 状态
     websocket,
@@ -631,5 +805,11 @@ export const useMqttProxyStore = defineStore('mqtt-proxy', () => {
     selectProfile,
     testConnection,
     checkNetworkConnectivity
+    ,
+    // DJI 服务调用
+    sendService,
+    requestFileUploadList,
+    requestFileUploadStart,
+    requestFileUploadUpdate
   }
 })

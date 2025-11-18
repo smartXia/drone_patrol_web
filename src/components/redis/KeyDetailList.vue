@@ -20,12 +20,12 @@
     </div>
     <el-table :data="items" height="calc(100% - 80px)">
       <el-table-column type="index" width="70" />
-      <el-table-column prop="value" label="Value">
+      <el-table-column label="Value">
         <template #default="{ row, $index }">
           <div style="display:flex; gap:8px; align-items:center;">
-            <el-input v-model="row.value" :disabled="!editing" />
-            <el-button size="small" type="primary" @click="lset($index, row.value)" :disabled="!editing">保存</el-button>
-            <el-popconfirm title="删除该元素？" @confirm="lrem(row.value)">
+            <el-input v-model="items[$index]" :disabled="!editing" />
+            <el-button size="small" type="primary" @click="lset($index, items[$index])" :disabled="!editing">保存</el-button>
+            <el-popconfirm title="删除该元素？" @confirm="lrem(items[$index])">
               <template #reference>
                 <el-button size="small" type="danger" :disabled="!editing">删除</el-button>
               </template>

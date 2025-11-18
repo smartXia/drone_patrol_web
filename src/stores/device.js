@@ -176,8 +176,12 @@ export const useDeviceStore = defineStore('device', () => {
   }
 
   const getTopicWithDeviceSn = (topicTemplate) => {
+    // 获取当前设备信息
+    const currentDevice = deviceList.value.find(device => device.sn === currentDeviceSn.value)
+    const airportSn = currentDevice?.airport_sn || currentDeviceSn.value
+    
     return topicTemplate
-      .replace(/\{device_sn\}/g, currentDeviceSn.value || 'DEVICE_SN')
+      .replace(/\{device_sn\}/g, airportSn || 'DEVICE_SN')
       .replace(/\{gateway_sn\}/g, currentGatewaySn.value || 'GATEWAY_SN')
   }
 

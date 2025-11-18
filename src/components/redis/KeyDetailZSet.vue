@@ -12,7 +12,7 @@
       </div>
     </template>
     <div class="bar">
-      <el-input-number v-model="score" :min="-999999" :max="999999" :disabled="!editing" />
+      <el-input-number v-model="score" :min="-2147483648" :max="2147483647" :disabled="!editing" :precision="0" />
       <el-input v-model="member" style="width: 60%;" placeholder="成员" :disabled="!editing" />
       <el-button size="small" type="primary" @click="zadd" :disabled="!editing">ZADD</el-button>
     </div>

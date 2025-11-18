@@ -27,6 +27,10 @@
                 <el-icon><Document /></el-icon>
                 <span>错误码查询</span>
               </el-menu-item>
+              <el-menu-item index="/live-stream">
+                <el-icon><VideoPlay /></el-icon>
+                <span>直播流</span>
+              </el-menu-item>
             </el-menu>
           </div>
           <div class="connection-status">
@@ -48,7 +52,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMqttStore } from '@/stores/mqtt'
-import { Monitor, DataBoard, Document } from '@element-plus/icons-vue'
+import { Monitor, DataBoard, Document, VideoPlay } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const mqttStore = useMqttStore()

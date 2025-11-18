@@ -125,7 +125,7 @@
              style="width: 400px; margin-right: 10px;"
              @keyup.enter="handleSubscribe"
            />
-           <span style="color: #909399; font-size: 12px;">示例: thing/product/{{ deviceStore.currentDeviceSn || 'DEVICE_SN' }}/events</span>
+           <span style="color: #909399; font-size: 12px;">示例: thing/product/{{ (deviceStore.currentDevice?.airport_sn || deviceStore.currentDeviceSn) || 'DEVICE_SN' }}/events</span>
          </div>
       
                       <div class="status-display" style="margin-top: 15px;">
@@ -239,8 +239,8 @@
                 <el-option
                   v-for="device in deviceStore.deviceList"
                   :key="device.sn"
-                  :label="`${device.name} (${device.sn})`"
-                  :value="device.sn"
+                  :label="`${device.name} (${device.airport_sn || device.sn})`"
+                  :value="device.airport_sn || device.sn"
                 >
                   <div class="device-option">
                     <el-tag 
@@ -251,7 +251,8 @@
                       {{ device.status === 'online' ? '在线' : '离线' }}
                     </el-tag>
                     <span>{{ device.name }}</span>
-                    <span style="color: #909399; font-size: 12px; margin-left: 8px;">{{ device.sn }}</span>
+                    <span style="color: #909399; font-size: 12px; margin-left: 8px;">{{ device.airport_sn || device.sn }}</span>
+                    <span v-if="device.airport_sn && device.sn !== device.airport_sn" style="color: #67c23a; font-size: 10px; margin-left: 4px;">(机场)</span>
                   </div>
                 </el-option>
               </el-select>
@@ -282,7 +283,11 @@
                   {{ deviceStore.currentDevice.status === 'online' ? '在线' : '离线' }}
                 </el-tag>
                 <span class="device-name">{{ deviceStore.currentDevice.name }}</span>
-                <span class="device-sn">{{ deviceStore.currentDeviceSn }}</span>
+                <span class="device-sn">{{ deviceStore.currentDevice.airport_sn || deviceStore.currentDevice.sn }}</span>
+                <span v-if="deviceStore.currentDevice.airport_sn && deviceStore.currentDevice.sn !== deviceStore.currentDevice.airport_sn" style="color: #67c23a; font-size: 10px; margin-left: 4px;">(机场)</span>
+                <div v-if="deviceStore.currentDevice.airport_sn && deviceStore.currentDevice.sn !== deviceStore.currentDevice.airport_sn" style="font-size: 10px; color: #909399; margin-top: 2px;">
+                  飞机SN: {{ deviceStore.currentDevice.sn }}
+                </div>
               </div>
               
               <!-- MQTT连接信息显示 -->
@@ -680,7 +685,35 @@
          </div>
          
          <!-- 聊天底部 -->
-         <div class="chat-footer">
+        <div class="chat-footer">
+          <div class="service-sender" style="display:flex; align-items:flex-start; gap:8px; margin-bottom:8px;">
+            <el-input 
+              v-model="serviceMethod" 
+              size="small" 
+              placeholder="方法名，点击右侧按钮选择" 
+              readonly
+              style="width: 220px; cursor: pointer;"
+              @click="openMethodPanel"
+            >
+              <template #append>
+                <el-button @click="openMethodPanel" :icon="Setting" />
+              </template>
+            </el-input>
+            <el-input 
+              v-model="serviceParams" 
+              size="small" 
+              type="textarea" 
+              :rows="2" 
+              placeholder='JSON参数，例如 {"module_list":["0","3"]}' 
+              style="flex:1;"
+            />
+            <el-button 
+              type="primary" 
+              size="small" 
+              :loading="sendingService" 
+              @click="handleSendService"
+            >发送</el-button>
+          </div>
            <div class="chat-status">
              <el-tag 
                :type="mqttProxyStore.isConnected ? 'success' : 'danger'"
@@ -722,6 +755,161 @@
        </el-tab-pane>
      </el-tabs>
    </el-drawer>
+
+   <!-- 方法选择弹出面板 -->
+   <el-dialog 
+     v-model="methodPanelVisible" 
+     title="选择方法" 
+     width="900px"
+     :close-on-click-modal="false"
+     @close="closeMethodPanel"
+   >
+     <div class="method-panel">
+       <!-- 搜索框和自定义输入 -->
+       <div style="margin-bottom: 20px;">
+         <el-input
+           v-model="methodSearchQuery"
+           placeholder="搜索方法或输入自定义方法名"
+           clearable
+           size="default"
+           @input="handleMethodSearch"
+         >
+           <template #prefix>
+             <el-icon><Search /></el-icon>
+           </template>
+         </el-input>
+       </div>
+
+       <!-- 左右布局：左侧方法列表，右侧参数编辑 -->
+       <div class="method-panel-layout">
+         <!-- 左侧：方法列表 -->
+         <div class="method-list-container">
+           <!-- 调试方法区域 -->
+           <div class="method-section">
+             <div class="method-section-header">
+               <el-tag type="warning" size="default">调试</el-tag>
+             </div>
+             <div class="method-list">
+               <div
+                 v-for="method in filteredDebugMethods"
+                 :key="method.value"
+                 class="method-item"
+                 :class="{ 'method-item-selected': selectedMethodTemp === method.value }"
+                 @click="selectMethod(method)"
+               >
+                 <div class="method-item-content">
+                   <div class="method-name">{{ method.value }}</div>
+                   <div class="method-label">{{ method.label }}</div>
+                 </div>
+                 <el-icon v-if="selectedMethodTemp === method.value" class="method-check-icon">
+                   <Check />
+                 </el-icon>
+               </div>
+             </div>
+           </div>
+
+           <!-- 业务方法区域（仅在有业务方法时显示） -->
+           <div v-if="filteredBusinessMethods.length > 0" class="method-section">
+             <div class="method-section-header">
+               <el-tag type="success" size="default">业务方法</el-tag>
+             </div>
+             <div class="method-list">
+               <div
+                 v-for="method in filteredBusinessMethods"
+                 :key="method.value"
+                 class="method-item"
+                 :class="{ 'method-item-selected': selectedMethodTemp === method.value }"
+                 @click="selectMethod(method)"
+               >
+                 <div class="method-item-content">
+                   <div class="method-name">{{ method.value }}</div>
+                   <div class="method-label">{{ method.label }}</div>
+                 </div>
+                 <el-icon v-if="selectedMethodTemp === method.value" class="method-check-icon">
+                   <Check />
+                 </el-icon>
+               </div>
+             </div>
+           </div>
+
+           <!-- 自定义方法名 -->
+           <div v-if="methodSearchQuery && !isMethodInList(methodSearchQuery)" class="custom-method-section">
+             <div class="method-section-header">
+               <el-tag type="info" size="default">自定义方法</el-tag>
+             </div>
+             <div 
+               class="method-item method-item-custom"
+               @click="selectCustomMethod(methodSearchQuery)"
+             >
+               <div class="method-item-content">
+                 <div class="method-name">{{ methodSearchQuery }}</div>
+                 <div class="method-label">点击使用此方法名</div>
+               </div>
+               <el-icon class="method-check-icon">
+                 <Plus />
+               </el-icon>
+             </div>
+           </div>
+         </div>
+
+         <!-- 右侧：参数编辑区域 -->
+         <div v-if="selectedMethodTemp" class="params-editor-container">
+           <div class="params-editor-section">
+             <div class="method-section-header">
+               <el-tag type="primary" size="default">方法参数</el-tag>
+               <span style="margin-left: 12px; color: #999; font-size: 12px;">{{ getSelectedMethodLabel() }}</span>
+             </div>
+             <div class="params-editor">
+               <el-input
+                 v-model="serviceParamsTemp"
+                 type="textarea"
+                 :rows="12"
+                 placeholder='请输入JSON格式的参数，例如：{"module_list":["0","3"]}'
+                 style="font-family: monospace; font-size: 13px;"
+                 @blur="validateParams"
+               />
+               <div class="params-actions">
+                 <el-button size="small" @click="loadDefaultParams" v-if="hasDefaultParams()">
+                   加载默认参数
+                 </el-button>
+                 <el-button size="small" @click="formatParams">
+                   格式化JSON
+                 </el-button>
+                 <el-button size="small" @click="clearParams">
+                   清空
+                 </el-button>
+                 <span v-if="paramsError" style="color: var(--el-color-error); font-size: 12px; margin-left: 12px;">
+                   {{ paramsError }}
+                 </span>
+                 <span v-else-if="serviceParamsTemp" style="color: var(--el-color-success); font-size: 12px; margin-left: 12px;">
+                   ✓ JSON格式正确
+                 </span>
+               </div>
+             </div>
+           </div>
+         </div>
+
+         <!-- 未选择方法时的提示 -->
+         <div v-else class="params-editor-container params-editor-empty">
+           <div class="empty-hint">
+             <el-icon style="font-size: 48px; color: #ccc; margin-bottom: 12px;"><Document /></el-icon>
+             <div style="color: #999; font-size: 14px;">请选择一个方法以编辑参数</div>
+           </div>
+         </div>
+       </div>
+     </div>
+     <template #footer>
+       <div style="display: flex; justify-content: space-between; align-items: center;">
+         <span style="color: #999; font-size: 12px;">
+           当前选择: <strong>{{ selectedMethodTemp || '未选择' }}</strong>
+         </span>
+         <div>
+           <el-button @click="closeMethodPanel">取消</el-button>
+           <el-button type="primary" @click="confirmMethodSelection" :disabled="!selectedMethodTemp">确定</el-button>
+         </div>
+       </div>
+     </template>
+   </el-dialog>
 
    <!-- 消息详情抽屉 -->
    <el-drawer
@@ -833,11 +1021,22 @@ const sidebarCollapsed = ref(false)
 // 设备管理抽屉状态
 const deviceManagerVisible = ref(false)
  
-const topicInput = ref(`thing/product/${deviceStore.currentDeviceSn || 'DEVICE_SN'}/events`)
+const topicInput = ref(`thing/product/${(deviceStore.currentDevice?.airport_sn || deviceStore.currentDeviceSn) || 'DEVICE_SN'}/events`)
 
 // 监听设备变化，更新输入框（不再自动重新订阅主题）
 watch(() => deviceStore.currentDeviceSn, (newSn, oldSn) => {
-  topicInput.value = `thing/product/${newSn || 'DEVICE_SN'}/events`
+  // 延迟获取设备信息，确保currentDevice已更新
+  setTimeout(() => {
+    const currentDevice = deviceStore.currentDevice
+    const airportSn = currentDevice?.airport_sn || newSn
+    topicInput.value = `thing/product/${airportSn || 'DEVICE_SN'}/events`
+    console.log('设备切换，更新主题输入框:', {
+      newSn,
+      airportSn,
+      currentDevice: currentDevice?.name,
+      topicInput: topicInput.value
+    })
+  }, 100) // 延迟100ms确保设备信息已更新
   
   // 设备切换时不再自动重新订阅主题
   // 用户需要手动订阅新设备的主题
@@ -968,11 +1167,99 @@ const handleDeviceManagerClose = (done) => {
 }
 
 
- onMounted(() => {
+ onMounted(async () => {
    if (route.query && (route.query.openMqtt === '1' || route.query.openMqtt === 1)) {
      openConnMgr()
    }
+   
+   // 自动连接MQTT和订阅设备
+   await autoConnectAndSubscribe()
  })
+
+// 自动连接MQTT和订阅设备
+const autoConnectAndSubscribe = async () => {
+  try {
+    console.log('Dashboard页面开始自动连接和订阅')
+    
+    // 加载设备列表
+    await deviceStore.loadDevices()
+    console.log('设备列表已加载:', deviceStore.deviceList.length, '个设备')
+    
+    // 如果MQTT未连接，尝试使用默认连接
+    if (!mqttProxyStore.isConnected) {
+      console.log('MQTT未连接，尝试使用默认连接')
+      try {
+        await mqttProxyStore.connect()
+        console.log('MQTT默认连接成功')
+      } catch (error) {
+        console.error('MQTT默认连接失败:', error)
+        ElMessage.warning('MQTT连接失败，请检查网络连接')
+        return
+      }
+    }
+    
+    // 等待MQTT连接稳定后自动订阅首个机场和飞机
+    setTimeout(async () => {
+      await autoSubscribeFirstDevices()
+    }, 1000)
+    
+  } catch (error) {
+    console.error('Dashboard自动连接和订阅失败:', error)
+  }
+}
+
+// 自动订阅首个设备
+const autoSubscribeFirstDevices = async () => {
+  try {
+    // 等待MQTT连接完成
+    if (!mqttProxyStore.isConnected) {
+      console.log('等待MQTT连接...')
+      return
+    }
+    
+    // 获取设备列表
+    const deviceList = deviceStore.deviceList
+    const airportDevices = deviceList.filter(device => device.type === 'airport' || device.airport_sn)
+    const aircraftDevices = deviceList.filter(device => device.type === 'aircraft' && device.airport_sn)
+    
+    // 获取首个机场设备
+    const firstAirport = airportDevices[0]
+    if (firstAirport) {
+      console.log('自动订阅首个机场:', firstAirport.sn)
+      try {
+        // 订阅机场OSD数据
+        const airportOsdTopic = `thing/product/${firstAirport.sn}/osd`
+        await mqttProxyStore.subscribeToTopics(airportOsdTopic, 1)
+        console.log('机场OSD订阅成功:', airportOsdTopic)
+      } catch (error) {
+        console.error('机场OSD订阅失败:', error)
+      }
+    }
+    
+    // 获取首个飞机设备
+    const firstAircraft = aircraftDevices[0]
+    if (firstAircraft) {
+      console.log('自动订阅首个飞机:', firstAircraft.sn)
+      try {
+        // 订阅飞机OSD数据
+        const aircraftOsdTopic = `thing/product/${firstAircraft.sn}/osd`
+        await mqttProxyStore.subscribeToTopics(aircraftOsdTopic, 1)
+        console.log('飞机OSD订阅成功:', aircraftOsdTopic)
+      } catch (error) {
+        console.error('飞机OSD订阅失败:', error)
+      }
+    }
+    
+    // 显示成功消息
+    if (firstAirport || firstAircraft) {
+      ElMessage.success('已自动订阅首个设备数据')
+    }
+    
+  } catch (error) {
+    console.error('自动订阅设备失败:', error)
+    ElMessage.warning('自动订阅设备失败，请手动订阅')
+  }
+}
  
  // 拖拽相关状态
  const draggedCategory = ref(null)
@@ -1187,9 +1474,19 @@ const handleDeviceChange = async (deviceSn) => {
         }
       }
       
-      // 切换设备
-      await deviceStore.setCurrentDevice(deviceSn)
-      ElMessage.success(`已切换到设备: ${deviceStore.currentDevice?.name || deviceSn}`)
+      // 找到对应的设备（通过airport_sn或sn匹配）
+      const targetDevice = deviceStore.deviceList.find(device => 
+        device.airport_sn === deviceSn || device.sn === deviceSn
+      )
+      
+      if (!targetDevice) {
+        ElMessage.error('未找到对应的设备')
+        return
+      }
+      
+      // 切换设备（使用设备内部的sn字段）
+      await deviceStore.setCurrentDevice(targetDevice.sn)
+      ElMessage.success(`已切换到设备: ${targetDevice.name} (${targetDevice.airport_sn || targetDevice.sn})`)
       
       // 如果之前已连接MQTT，自动重新连接
       if (wasConnected) {
@@ -1410,6 +1707,254 @@ const getTopicMessages = (topic) => {
    if (!list || list.length === 0) return null
    return list[list.length - 1]
  }
+ 
+  // ===== 服务端发送（方法+参数） =====
+  const serviceMethods = ref({
+    debug: [
+      { value: 'debug_mode_open', label: '开启调试', params: '{}' },
+      { value: 'debug_mode_close', label: '关闭调试', params: '{}' },
+      { value: 'cover_open', label: '打开舱盖', params: '{}' },
+      { value: 'cover_close', label: '关闭舱盖', params: '{}' },
+      { value: 'supplement_light_open', label: '打开补光灯', params: '{}' },
+      { value: 'supplement_light_close', label: '关闭补光灯', params: '{}' },
+      { value: 'device_reboot', label: '机场重启', params: '{}' }
+    ],
+    business: [
+      { value: 'live_set_params', label: '设置直播参数', params: '{"resolution":"1920x1080","bitrate":2000,"fps":25,"quality":"high","audio_enabled":false}' },
+      { value: 'live_start', label: '开始直播', params: '{"data":{"url":"channel=1ZNDH1D0010098_39-0-7&sn=1ZNDH1D0010098&token=006dca67721582a48768ec4d817b7b25a86IADk%2Fcm%2Fdv%2BHY6qT%2FAKM6y7TcUe4lXNvZpycH7vUMAlM6pFALUKF2zyCIgA82pQE8cCoYAQAAQDxwKhgAgDxwKhgAwDxwKhgBADxwKhg&uid=50000","url_type":0,"video_id":"1ZNDH1D0010098/39-0-7/normal-0","video_quality":0}}' },
+      { value: 'live_stop', label: '停止直播', params: '{"video_id":"1ZNDH1D0010098/42-0-0/zoom-0"}' },
+      { value: 'live_lens_change', label: '设置直播摄像头', params: '{"video_id":"1581F5BMD228Q00A82XX/39-0-7/zoom-0","video_type":"zoom"}' }
+    ]
+  })
+  
+  const serviceMethod = ref('debug_mode_open')
+  const serviceParams = ref('{}')
+  const sendingService = ref(false)
+  
+  // 方法选择面板相关
+  const methodPanelVisible = ref(false)
+  const methodSearchQuery = ref('')
+  const selectedMethodTemp = ref(null)
+  const serviceParamsTemp = ref('')
+  const paramsError = ref('')
+  
+  // 打开方法选择面板
+  const openMethodPanel = () => {
+    methodPanelVisible.value = true
+    selectedMethodTemp.value = serviceMethod.value
+    serviceParamsTemp.value = serviceParams.value
+    methodSearchQuery.value = ''
+    paramsError.value = ''
+    // 如果有选中的方法，加载默认参数
+    if (selectedMethodTemp.value) {
+      loadParamsForMethod(selectedMethodTemp.value)
+    }
+  }
+  
+  // 确认方法选择
+  const confirmMethodSelection = () => {
+    // 验证参数格式
+    if (!validateParams()) {
+      ElMessage.warning('请修正参数格式错误')
+      return
+    }
+    if (selectedMethodTemp.value) {
+      serviceMethod.value = selectedMethodTemp.value
+      // 如果参数为空或只包含空白，设置为空对象
+      if (!serviceParamsTemp.value || !serviceParamsTemp.value.trim()) {
+        serviceParams.value = '{}'
+      } else {
+        serviceParams.value = serviceParamsTemp.value
+      }
+    }
+    methodPanelVisible.value = false
+    methodSearchQuery.value = ''
+    paramsError.value = ''
+    ElMessage.success('方法和参数已更新')
+  }
+  
+  // 关闭方法选择面板（恢复原值）
+  const closeMethodPanel = () => {
+    selectedMethodTemp.value = serviceMethod.value
+    serviceParamsTemp.value = serviceParams.value
+    methodPanelVisible.value = false
+    methodSearchQuery.value = ''
+    paramsError.value = ''
+  }
+  
+  // 选择方法
+  const selectMethod = (method) => {
+    selectedMethodTemp.value = method.value
+    loadParamsForMethod(method.value)
+  }
+  
+  // 选择自定义方法
+  const selectCustomMethod = (methodName) => {
+    selectedMethodTemp.value = methodName
+    // 自定义方法没有默认参数，保持当前参数或设为空对象
+    if (!serviceParamsTemp.value || serviceParamsTemp.value.trim() === '') {
+      serviceParamsTemp.value = '{}'
+    }
+    paramsError.value = ''
+  }
+  
+  // 为方法加载参数
+  const loadParamsForMethod = (methodValue) => {
+    const allMethods = [...serviceMethods.value.debug, ...serviceMethods.value.business]
+    const method = allMethods.find(m => m.value === methodValue)
+    if (method && method.params) {
+      serviceParamsTemp.value = method.params
+      paramsError.value = ''
+    } else {
+      // 如果没有默认参数，设为空对象
+      if (!serviceParamsTemp.value || serviceParamsTemp.value.trim() === '') {
+        serviceParamsTemp.value = '{}'
+      }
+    }
+    validateParams()
+  }
+  
+  // 获取选中方法的标签
+  const getSelectedMethodLabel = () => {
+    if (!selectedMethodTemp.value) return ''
+    const allMethods = [...serviceMethods.value.debug, ...serviceMethods.value.business]
+    const method = allMethods.find(m => m.value === selectedMethodTemp.value)
+    return method ? method.label : ''
+  }
+  
+  // 检查是否有默认参数
+  const hasDefaultParams = () => {
+    if (!selectedMethodTemp.value) return false
+    const allMethods = [...serviceMethods.value.debug, ...serviceMethods.value.business]
+    const method = allMethods.find(m => m.value === selectedMethodTemp.value)
+    return method && method.params && method.params !== '{}'
+  }
+  
+  // 加载默认参数
+  const loadDefaultParams = () => {
+    if (selectedMethodTemp.value) {
+      loadParamsForMethod(selectedMethodTemp.value)
+    }
+  }
+  
+  // 格式化参数JSON
+  const formatParams = () => {
+    try {
+      if (serviceParamsTemp.value && serviceParamsTemp.value.trim()) {
+        const parsed = JSON.parse(serviceParamsTemp.value)
+        serviceParamsTemp.value = JSON.stringify(parsed, null, 2)
+        paramsError.value = ''
+        ElMessage.success('JSON格式化成功')
+      }
+    } catch (e) {
+      paramsError.value = 'JSON格式错误: ' + e.message
+      ElMessage.error('JSON格式错误: ' + e.message)
+    }
+  }
+  
+  // 清空参数
+  const clearParams = () => {
+    serviceParamsTemp.value = '{}'
+    paramsError.value = ''
+  }
+  
+  // 验证参数格式
+  const validateParams = () => {
+    if (!serviceParamsTemp.value || serviceParamsTemp.value.trim() === '') {
+      paramsError.value = ''
+      return true
+    }
+    try {
+      JSON.parse(serviceParamsTemp.value)
+      paramsError.value = ''
+      return true
+    } catch (e) {
+      paramsError.value = 'JSON格式错误: ' + e.message
+      return false
+    }
+  }
+  
+  // 检查方法是否在列表中
+  const isMethodInList = (methodName) => {
+    const allMethods = [...serviceMethods.value.debug, ...serviceMethods.value.business]
+    return allMethods.some(m => m.value === methodName)
+  }
+  
+  // 过滤调试方法
+  const filteredDebugMethods = computed(() => {
+    if (!methodSearchQuery.value) {
+      return serviceMethods.value.debug
+    }
+    const query = methodSearchQuery.value.toLowerCase()
+    return serviceMethods.value.debug.filter(m => 
+      m.value.toLowerCase().includes(query) || 
+      m.label.toLowerCase().includes(query)
+    )
+  })
+  
+  // 过滤业务方法
+  const filteredBusinessMethods = computed(() => {
+    if (!methodSearchQuery.value) {
+      return serviceMethods.value.business
+    }
+    const query = methodSearchQuery.value.toLowerCase()
+    return serviceMethods.value.business.filter(m => 
+      m.value.toLowerCase().includes(query) || 
+      m.label.toLowerCase().includes(query)
+    )
+  })
+  
+  // 方法搜索处理
+  const handleMethodSearch = () => {
+    // 搜索时自动选择匹配的第一个方法（如果有）
+    const allFiltered = [...filteredDebugMethods.value, ...filteredBusinessMethods.value]
+    if (allFiltered.length > 0 && !isMethodInList(methodSearchQuery.value)) {
+      // 如果有搜索匹配的方法，不自动选择自定义方法
+    }
+  }
+  
+  // 方法切换处理
+  const handleMethodChange = (methodValue) => {
+    // 从所有方法列表中查找
+    const allMethods = [...serviceMethods.value.debug, ...serviceMethods.value.business]
+    const method = allMethods.find(m => m.value === methodValue)
+    if (method && method.params) {
+      serviceParams.value = method.params
+    } else if (!method) {
+      // 自定义方法名，不更新参数，保持当前参数不变
+      // 用户可以手动编辑参数
+    }
+  }
+ 
+  const handleSendService = async () => {
+    try {
+      if (!serviceMethod.value) {
+        ElMessage.warning('请选择方法')
+        return
+      }
+      let data = {}
+      if (serviceParams.value && serviceParams.value.trim()) {
+        try {
+          data = JSON.parse(serviceParams.value)
+        } catch (e) {
+          ElMessage.error('参数必须是合法的JSON')
+          return
+        }
+      }
+      const gatewaySn = deviceStore.currentDevice?.airport_sn || deviceStore.currentDeviceSn
+      if (!gatewaySn) {
+        ElMessage.error('缺少网关SN（机场SN）')
+        return
+      }
+      sendingService.value = true
+      const { tid } = await mqttProxyStore.sendService(gatewaySn, serviceMethod.value, data, { autoSubscribeReply: true })
+      ElMessage.success(`已发送服务调用，tid=${tid}`)
+    } catch (err) {
+      ElMessage.error(err?.message || '发送失败')
+    } finally {
+      sendingService.value = false
+    }
+  }
  
  // 格式化消息内容
  const formatMessagePayload = (payload) => {
@@ -1746,7 +2291,30 @@ const openAircraftDetail = (deviceSn) => {
     ElMessage.warning('设备SN为空，无法打开详情页')
     return
   }
-  router.push({ name: 'AircraftDetail', params: { deviceSn } })
+  
+  // 获取当前设备信息
+  const currentDevice = deviceStore.currentDevice
+  const airportSn = currentDevice?.airport_sn
+  const aircraftSn = deviceSn
+  
+  if (airportSn && airportSn !== aircraftSn) {
+    // 使用新的双参数路由：/aircraft/:airportSn/:aircraftSn
+    console.log('使用新路由格式:', { airportSn, aircraftSn })
+    router.push({ 
+      name: 'AircraftDetail', 
+      params: { 
+        airportSn: airportSn,
+        aircraftSn: aircraftSn 
+      } 
+    })
+  } else {
+    // 使用旧的单参数路由：/aircraft/:deviceSn
+    console.log('使用旧路由格式:', { deviceSn })
+    router.push({ 
+      name: 'AircraftDetailLegacy', 
+      params: { deviceSn } 
+    })
+  }
 }
 
 // 打开摄像头直播页面

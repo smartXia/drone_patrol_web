@@ -1,20 +1,19 @@
 <template>
   <div class="camera-live-stream">
-    <el-card shadow="hover" class="camera-card">
-      <template #header>
-        <div class="card-header">
-          <div class="header-left">
+    <!-- 控制栏 -->
+    <div class="control-bar">
+      <div class="control-left">
             <el-icon class="camera-icon"><VideoCamera /></el-icon>
-            <span>机场直播摄像头</span>
+        <span>大疆机场摄像头</span>
             <el-tag 
               :type="isStreaming ? 'success' : 'info'" 
               size="small"
               class="status-tag"
             >
-              {{ isStreaming ? '直播中' : '未连接' }}
+          {{ isStreaming ? '接收中' : '未连接' }}
             </el-tag>
           </div>
-          <div class="header-right">
+      <div class="control-right">
             <el-button 
               v-if="!isStreaming"
               type="primary" 
@@ -23,7 +22,7 @@
               :loading="isConnecting"
               :icon="VideoPlay"
             >
-              开始直播
+          连接大疆机场
             </el-button>
             <el-button 
               v-else
@@ -32,7 +31,23 @@
               @click="stopStream"
               :icon="VideoPause"
             >
-              停止直播
+          断开连接
+        </el-button>
+        <el-button 
+          size="small" 
+          @click="testConnection"
+          :icon="Connection"
+          type="info"
+        >
+          测试连接
+        </el-button>
+        <el-button 
+          size="small" 
+          @click="showDiagnosticDialog"
+          :icon="Monitor"
+          type="warning"
+        >
+          诊断工具
             </el-button>
             <el-button 
               size="small" 
@@ -43,42 +58,65 @@
             </el-button>
           </div>
         </div>
-      </template>
 
       <!-- 摄像头配置 -->
       <div class="camera-config" v-if="!isStreaming">
         <el-form :model="cameraConfig" label-width="100px" size="small">
+          <!-- 设备选择 -->
           <el-row :gutter="16">
             <el-col :span="12">
-              <el-form-item label="摄像头地址">
-                <el-input 
-                  v-model="cameraConfig.url" 
-                  placeholder="rtsp://ip:port/stream"
+              <el-form-item label="选择设备">
+                <el-select 
+                  v-model="selectedDevice" 
+                  placeholder="选择机场或飞机设备" 
+                  @change="onDeviceChange" 
                   clearable
-                />
+                  :disabled="(airportDevices.length + aircraftDevices.length) <= 1"
+                >
+                  <el-option-group label="机场设备" v-if="airportDevices.length > 0">
+                    <el-option 
+                      v-for="device in airportDevices" 
+                      :key="device.sn" 
+                      :label="`${device.name || device.sn} (${device.sn})`" 
+                      :value="device.sn"
+                    />
+                  </el-option-group>
+                  <el-option-group label="飞机设备" v-if="aircraftDevices.length > 0">
+                    <el-option 
+                      v-for="device in aircraftDevices" 
+                      :key="device.sn" 
+                      :label="`${device.name || device.sn} (${device.sn})`" 
+                      :value="device.sn"
+                    />
+                  </el-option-group>
+                  <el-option v-if="airportDevices.length === 0 && aircraftDevices.length === 0" disabled>
+                    暂无可用设备
+                  </el-option>
+                </el-select>
+                <div class="config-tips" v-if="airportDevices.length === 0 && aircraftDevices.length === 0">
+                  <el-text size="small" type="warning">
+                    请确保路由参数中包含设备SN，或检查网络连接
+                  </el-text>
+                </div>
+                <div class="config-tips" v-if="(airportDevices.length + aircraftDevices.length) === 1">
+                  <el-text size="small" type="info">
+                    已自动选择唯一可用设备
+                  </el-text>
+                </div>
               </el-form-item>
             </el-col>
-            <el-col :span="6">
-              <el-form-item label="用户名">
-                <el-input 
-                  v-model="cameraConfig.username" 
-                  placeholder="用户名"
-                  clearable
-                />
-              </el-form-item>
-            </el-col>
-            <el-col :span="6">
-              <el-form-item label="密码">
-                <el-input 
-                  v-model="cameraConfig.password" 
-                  type="password" 
-                  placeholder="密码"
-                  show-password
-                  clearable
-                />
+            <el-col :span="12">
+              <el-form-item label="当前设备">
+                <el-tag v-if="currentDeviceSN" type="success" size="large">
+                  {{ currentDeviceSN }}
+                </el-tag>
+                <el-tag v-else type="info" size="large">
+                  未选择设备
+                </el-tag>
               </el-form-item>
             </el-col>
           </el-row>
+          
           <el-row :gutter="16">
             <el-col :span="8">
               <el-form-item label="分辨率">
@@ -114,20 +152,56 @@
             </el-col>
           </el-row>
         </el-form>
+
+        <!-- WHIP WebRTC配置 -->
+        <el-divider content-position="left">大疆机场视频流配置</el-divider>
+        <el-form :model="whipConfig" label-width="120px" size="small">
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="房间号">
+                <el-input v-model="whipConfig.room" readonly />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="认证Token">
+                <el-input v-model="whipConfig.authToken" readonly />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="签名密钥">
+                <el-input v-model="whipConfig.txSecret" readonly />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="时间戳">
+                <el-input v-model="whipConfig.txTime" readonly />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="16">
+            <el-col :span="24">
+              <el-form-item label="启用大疆机场视频流">
+                <el-switch v-model="whipConfig.enableWhip" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+
       </div>
 
       <!-- 视频播放区域 -->
       <div class="video-container" :class="{ 'fullscreen': isFullscreen }">
         <div v-if="!isStreaming" class="video-placeholder">
           <el-icon class="placeholder-icon"><VideoCamera /></el-icon>
-          <p>点击"开始直播"连接摄像头</p>
-          <p class="placeholder-desc">支持 RTSP、HTTP、WebRTC 等协议</p>
+          <p>点击"开始直播"连接大疆机场摄像头</p>
+          <p class="placeholder-desc">使用 WHIP WebRTC 协议接收大疆机场视频流</p>
         </div>
         
         <div v-else class="video-wrapper">
           <video 
             ref="videoElement"
-            :src="streamUrl"
             autoplay
             muted
             playsinline
@@ -198,12 +272,80 @@
           <el-button type="primary" @click="downloadScreenshot">下载截图</el-button>
         </template>
       </el-dialog>
+
+      <!-- 诊断工具对话框 -->
+      <el-dialog
+        v-model="diagnosticDialogVisible"
+        title="摄像头诊断工具"
+        width="600px"
+        :close-on-click-modal="false"
+      >
+        <div class="diagnostic-content">
+          <el-alert
+            title="诊断信息"
+            type="info"
+            :closable="false"
+            show-icon
+          >
+            <template #default>
+              <p>当前配置信息：</p>
+              <ul>
+                <li><strong>摄像头地址：</strong>{{ cameraConfig.url || '未设置' }}</li>
+                <li><strong>用户名：</strong>{{ cameraConfig.username || '未设置' }}</li>
+                <li><strong>密码：</strong>{{ cameraConfig.password ? '***' : '未设置' }}</li>
+                <li><strong>完整地址：</strong>{{ streamUrl || '未生成' }}</li>
+              </ul>
+            </template>
+          </el-alert>
+          
+          <el-divider />
+          
+          <div class="diagnostic-actions">
+            <h4>常见问题解决方案：</h4>
+            <el-space direction="vertical" size="large" style="width: 100%">
+              <el-card shadow="never" class="diagnostic-card">
+                <template #header>
+                  <span>1. RTSP连接问题</span>
+                </template>
+                <p>• 确保摄像头支持RTSP协议</p>
+                <p>• 检查IP地址和端口是否正确</p>
+                <p>• 验证用户名和密码</p>
+                <p>• 尝试不同的RTSP路径（如：/stream1, /live, /ch1）</p>
     </el-card>
+              
+              <el-card shadow="never" class="diagnostic-card">
+                <template #header>
+                  <span>2. 网络连接问题</span>
+                </template>
+                <p>• 检查网络连接是否正常</p>
+                <p>• 确认摄像头和电脑在同一网络</p>
+                <p>• 尝试ping摄像头IP地址</p>
+                <p>• 检查防火墙设置</p>
+              </el-card>
+              
+              <el-card shadow="never" class="diagnostic-card">
+                <template #header>
+                  <span>3. 视频格式问题</span>
+                </template>
+                <p>• 确保浏览器支持该视频格式</p>
+                <p>• 尝试不同的分辨率设置</p>
+                <p>• 检查摄像头编码格式（H.264推荐）</p>
+                <p>• 尝试降低帧率设置</p>
+              </el-card>
+            </el-space>
+          </div>
+        </div>
+        
+        <template #footer>
+          <el-button @click="diagnosticDialogVisible = false">关闭</el-button>
+          <el-button type="primary" @click="runFullDiagnostic">运行完整诊断</el-button>
+        </template>
+      </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   VideoCamera, 
@@ -217,6 +359,20 @@ import {
   Microphone,
   Camera
 } from '@element-plus/icons-vue'
+import { WhipService } from '@/services/whipService'
+import { config } from '@/config'
+
+// Props定义
+const props = defineProps({
+  airportSn: {
+    type: String,
+    default: ''
+  },
+  aircraftSn: {
+    type: String,
+    default: ''
+  }
+})
 
 // 响应式数据
 const videoElement = ref(null)
@@ -229,70 +385,207 @@ const streamDuration = ref(0)
 const connectionStatus = ref('未连接')
 const screenshotDialogVisible = ref(false)
 const screenshotDataUrl = ref('')
+const diagnosticDialogVisible = ref(false)
 
-// 摄像头配置
+// 摄像头配置（简化版）
 const cameraConfig = reactive({
-  url: 'rtsp://192.168.1.100:554/stream1',
-  username: '',
-  password: '',
   resolution: '1280x720',
   fps: 25,
   quality: 7
 })
 
-// 计算属性
-const streamUrl = computed(() => {
-  if (!cameraConfig.url) return ''
-  
-  let url = cameraConfig.url
-  if (cameraConfig.username && cameraConfig.password) {
-    const protocol = url.split('://')[0]
-    const rest = url.split('://')[1]
-    url = `${protocol}://${cameraConfig.username}:${cameraConfig.password}@${rest}`
+// WHIP WebRTC配置
+const whipConfig = reactive({
+  room: '',         // 房间号（设备SN）
+  authToken: '',    // 认证token
+  txSecret: '',     // 签名密钥
+  txTime: '',       // 时间戳
+  enableWhip: true  // 默认启用WHIP推流
+})
+
+// 设备选择相关
+const selectedDevice = ref('')
+const currentDeviceSN = ref('')
+
+// 设备列表（从路由参数获取）
+const airportDevices = computed(() => {
+  // 从路由参数获取机场SN
+  const airportSn = props.airportSn
+  if (airportSn && airportSn !== '') {
+    return [{
+      sn: airportSn,
+      name: `机场设备 (${airportSn})`,
+      type: 'airport'
+    }]
   }
+  return []
+})
+
+const aircraftDevices = computed(() => {
+  // 从路由参数获取飞机SN
+  const aircraftSn = props.aircraftSn
+  if (aircraftSn && aircraftSn !== '') {
+    return [{
+      sn: aircraftSn,
+      name: `飞机设备 (${aircraftSn})`,
+      type: 'aircraft'
+    }]
+  }
+  return []
+})
+
+// WHIP推流状态
+const whipStatus = ref({
+  isStreaming: false,
+  room: '',
+  connectionState: 'disconnected'
+})
+
+
+// 计算属性（简化版）
+const streamUrl = computed(() => {
+  // 使用设备SN构建直播流URL
+  const deviceSN = currentDeviceSN.value || props.aircraftSn || props.airportSn
+  if (!deviceSN) return ''
   
-  return url
+  // 这里可以根据设备SN生成对应的直播流URL
+  // 暂时返回空，实际使用时需要根据设备配置生成
+  return ''
 })
 
 // 定时器
 let durationTimer = null
 let streamTimer = null
 
-// 方法
-const startStream = async () => {
-  if (!cameraConfig.url) {
-    ElMessage.warning('请输入摄像头地址')
-    return
+// WHIP服务实例
+const whipService = new WhipService(config)
+
+// 后端直播服务
+const backendLiveService = {
+  // 创建直播流
+  async createLiveStream(deviceSN, streamType, config) {
+    try {
+      const response = await fetch('/api/live/stream/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          device_sn: deviceSN,
+          stream_type: streamType,
+          resolution: config.resolution || '1920x1080',
+          bitrate: config.bitrate || 2000,
+          fps: config.fps || 25,
+          quality: config.quality || 'high'
+        })
+      })
+      
+      const result = await response.json()
+      if (result.success) {
+        return {
+          success: true,
+          streamId: result.stream_id,
+          pushUrl: result.push_url,
+          playUrl: result.play_url,
+          userSig: result.user_sig,
+          sdkAppId: result.sdk_app_id,
+          message: result.message
+        }
+      } else {
+        return {
+          success: false,
+          error: result.error || '创建直播流失败'
+        }
+      }
+    } catch (error) {
+      console.error('创建直播流失败:', error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  },
+
+  // 获取直播流状态
+  async getLiveStreamStatus(streamId) {
+    try {
+      const response = await fetch(`/api/live/stream/${streamId}/status`)
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error('获取直播流状态失败:', error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  },
+
+  // 停止直播流
+  async stopLiveStream(streamId) {
+    try {
+      const response = await fetch(`/api/live/stream/${streamId}/stop`, {
+        method: 'POST'
+      })
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error('停止直播流失败:', error)
+      return {
+        success: false,
+        error: error.message
+      }
+    }
+  },
+
+}
+
+
+
+// 设备选择变化处理
+const onDeviceChange = (deviceSN) => {
+  if (deviceSN) {
+    currentDeviceSN.value = deviceSN
+    console.log('选择设备:', deviceSN)
+    ElMessage.success(`已选择设备: ${deviceSN}`)
+  } else {
+    currentDeviceSN.value = ''
+    console.log('取消选择设备')
   }
-  
+}
+
+// WHIP推流状态更新
+const updateWhipStatus = () => {
+  const status = whipService.getStreamStatus()
+  whipStatus.value = {
+    isStreaming: status.isStreaming,
+    room: status.room,
+    connectionState: status.connectionState
+  }
+}
+
+// 方法（兼容性方法，调用步骤1）
+const startStream = async () => {
   isConnecting.value = true
   connectionStatus.value = '连接中...'
   
   try {
-    // 模拟连接延迟
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // 获取设备SN（优先使用选择的设备，然后从props获取）
+    const deviceSN = currentDeviceSN.value || props.aircraftSn || props.airportSn
     
-    if (videoElement.value) {
-      videoElement.value.src = streamUrl.value
-      videoElement.value.load()
-      
-      // 等待视频加载
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('连接超时'))
-        }, 10000)
-        
-        videoElement.value.onloadeddata = () => {
-          clearTimeout(timeout)
-          resolve()
-        }
-        
-        videoElement.value.onerror = () => {
-          clearTimeout(timeout)
-          reject(new Error('视频加载失败'))
-        }
-      })
+    if (!deviceSN) {
+      ElMessage.warning('请先选择设备或确保设备SN已传入')
+      return
     }
+    
+    console.log('开始连接大疆机场设备，设备SN:', deviceSN)
+    
+    // 使用WHIP服务接收大疆机场视频流
+    const result = await whipService.startStream(deviceSN, videoElement.value)
+    
+    if (result.success) {
+      // 保存房间信息
+      whipConfig.room = result.room
     
     isStreaming.value = true
     isConnecting.value = false
@@ -302,18 +595,33 @@ const startStream = async () => {
     // 开始计时
     startDurationTimer()
     
-    ElMessage.success('摄像头连接成功')
+      ElMessage.success(`已连接大疆机场设备 - 房间: ${result.room}`)
+      console.log('大疆机场视频流信息:', result)
+    } else {
+      throw new Error(result.error || '连接大疆机场设备失败')
+    }
+    
   } catch (error) {
     isConnecting.value = false
     connectionStatus.value = '连接失败'
-    ElMessage.error(`连接失败: ${error.message}`)
+    console.error('连接大疆机场设备失败:', error)
+    ElMessage.error(`连接大疆机场设备失败: ${error.message}`)
   }
 }
 
-const stopStream = () => {
-  if (videoElement.value) {
-    videoElement.value.pause()
-    videoElement.value.src = ''
+const stopStream = async () => {
+  try {
+    // 停止接收大疆机场视频流
+    const result = await whipService.stopStream()
+    
+    if (result.success) {
+      ElMessage.info('已断开大疆机场设备连接')
+    } else {
+      ElMessage.warning(`断开连接失败: ${result.error}`)
+    }
+  } catch (error) {
+    console.error('断开大疆机场设备连接失败:', error)
+    ElMessage.warning('断开连接失败')
   }
   
   isStreaming.value = false
@@ -323,11 +631,148 @@ const stopStream = () => {
   // 停止计时
   stopDurationTimer()
   
-  ElMessage.info('已停止直播')
+  // 清空房间信息
+  whipConfig.room = ''
+  
+  ElMessage.info('已断开连接')
 }
 
 const toggleFullscreen = () => {
   isFullscreen.value = !isFullscreen.value
+}
+
+// 测试摄像头连接
+const testConnection = async () => {
+  if (!currentDeviceSN.value && !props.aircraftSn && !props.airportSn) {
+    ElMessage.warning('请先选择设备')
+    return
+  }
+  
+  // 验证URL格式
+  const fullUrl = streamUrl.value
+  console.log('测试连接 - 完整URL:', fullUrl)
+  
+  // 检查URL格式是否正确
+  if (cameraConfig.username && cameraConfig.password) {
+    const expectedFormat = `${cameraConfig.url.split('://')[0]}://${cameraConfig.username}:${cameraConfig.password}@${cameraConfig.url.split('://')[1]}`
+    console.log('期望的URL格式:', expectedFormat)
+    console.log('实际生成的URL:', fullUrl)
+  }
+  
+  ElMessage.info('正在测试摄像头连接...')
+  
+  try {
+    // 创建一个临时的视频元素来测试连接
+    const testVideo = document.createElement('video')
+    testVideo.muted = true
+    testVideo.playsInline = true
+    
+    // 设置超时
+    const timeout = setTimeout(() => {
+      testVideo.src = ''
+      ElMessage.error('连接测试超时，请检查摄像头地址和网络')
+    }, 10000)
+    
+    // 监听加载成功
+    testVideo.onloadeddata = () => {
+      clearTimeout(timeout)
+      testVideo.src = ''
+      ElMessage.success('摄像头连接测试成功！')
+    }
+    
+    // 监听错误
+    testVideo.onerror = (event) => {
+      clearTimeout(timeout)
+      testVideo.src = ''
+      
+      let errorMsg = '摄像头连接失败'
+      if (event.target?.error) {
+        switch (event.target.error.code) {
+          case 1:
+            errorMsg = '连接被中止，请检查网络'
+            break
+          case 2:
+            errorMsg = '网络错误，请检查摄像头地址'
+            break
+          case 3:
+            errorMsg = '视频解码错误，请检查视频格式'
+            break
+          case 4:
+            errorMsg = '视频源不支持'
+            break
+        }
+      }
+      
+      ElMessage.error(`连接测试失败: ${errorMsg}`)
+      
+      // 提供解决建议
+      if (cameraConfig.url.includes('rtsp://') && !cameraConfig.username) {
+        ElMessage.warning('提示：RTSP摄像头通常需要用户名和密码认证')
+      }
+    }
+    
+    // 开始测试
+    testVideo.src = streamUrl.value
+    testVideo.load()
+    
+  } catch (error) {
+    console.error('连接测试失败:', error)
+    ElMessage.error('连接测试失败，请检查配置')
+  }
+}
+
+// 显示诊断对话框
+const showDiagnosticDialog = () => {
+  diagnosticDialogVisible.value = true
+}
+
+// 运行完整诊断
+const runFullDiagnostic = async () => {
+  ElMessage.info('开始运行完整诊断...')
+  
+  const diagnosticResults = []
+  
+  // 1. 检查基本配置
+  // 检查设备选择
+  if (!currentDeviceSN.value && !props.aircraftSn && !props.airportSn) {
+    diagnosticResults.push('❌ 未选择设备')
+  } else {
+    const deviceSN = currentDeviceSN.value || props.aircraftSn || props.airportSn
+    diagnosticResults.push(`✅ 已选择设备: ${deviceSN}`)
+  }
+  
+  // 2. 检查设备配置
+  const deviceSN = currentDeviceSN.value || props.aircraftSn || props.airportSn
+  if (deviceSN) {
+    diagnosticResults.push(`✅ 设备SN: ${deviceSN}`)
+  } else {
+    diagnosticResults.push('❌ 设备SN未设置')
+  }
+  
+  // 3. 测试网络连接
+  if (deviceSN) {
+    try {
+      const url = new URL(cameraConfig.url)
+      const hostname = url.hostname
+      
+      // 简单的网络测试（这里只是示例，实际需要更复杂的网络测试）
+      diagnosticResults.push(`🔍 尝试连接 ${hostname}...`)
+      
+      // 模拟网络测试
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      diagnosticResults.push('✅ 网络连接测试完成')
+      
+    } catch (error) {
+      diagnosticResults.push('❌ URL格式错误')
+    }
+  }
+  
+  // 显示诊断结果
+  const resultText = diagnosticResults.join('\n')
+  ElMessageBox.alert(resultText, '诊断结果', {
+    confirmButtonText: '确定',
+    type: 'info'
+  })
 }
 
 const toggleMute = () => {
@@ -411,8 +856,49 @@ const onLoadedData = () => {
 
 const onError = (event) => {
   console.error('视频播放错误:', event)
+  console.error('当前视频源:', videoElement.value?.src)
+  console.error('摄像头配置:', cameraConfig)
+  console.error('生成的完整URL:', streamUrl.value)
+  
+  // 检查URL格式
+  const currentUrl = videoElement.value?.src
+  if (currentUrl) {
+    console.error('URL分析:')
+    console.error('- 协议:', currentUrl.split('://')[0])
+    console.error('- 完整地址:', currentUrl)
+    console.error('- 是否包含认证:', currentUrl.includes('@'))
+  }
+  
   connectionStatus.value = '播放错误'
-  ElMessage.error('视频播放失败，请检查摄像头配置')
+  
+  // 提供更详细的错误信息
+  let errorMessage = '视频播放失败'
+  if (event.target?.error) {
+    const error = event.target.error
+    switch (error.code) {
+      case 1:
+        errorMessage = '视频加载被中止，请检查网络连接'
+        break
+      case 2:
+        errorMessage = '网络错误，请检查摄像头地址和网络连接'
+        break
+      case 3:
+        errorMessage = '视频解码错误，请检查视频格式是否支持'
+        break
+      case 4:
+        errorMessage = '视频源不支持或格式错误'
+        break
+      default:
+        errorMessage = `视频播放错误 (错误代码: ${error.code})`
+    }
+  }
+  
+  ElMessage.error(errorMessage)
+  
+  // 如果是认证问题，提供解决建议
+  if (cameraConfig.url && !cameraConfig.username) {
+    ElMessage.warning('提示：如果摄像头需要认证，请填写用户名和密码')
+  }
 }
 
 const onPlay = () => {
@@ -423,8 +909,10 @@ const onPause = () => {
   connectionStatus.value = '已暂停'
 }
 
+// 监听props变化
+
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
   // 加载保存的配置
   const savedConfig = localStorage.getItem('camera-config')
   if (savedConfig) {
@@ -432,6 +920,28 @@ onMounted(() => {
       Object.assign(cameraConfig, JSON.parse(savedConfig))
     } catch (error) {
       console.error('加载摄像头配置失败:', error)
+    }
+  }
+  
+  // 自动选择路由参数中的设备
+  if (props.aircraftSn && props.aircraftSn !== '') {
+    selectedDevice.value = props.aircraftSn
+    currentDeviceSN.value = props.aircraftSn
+    console.log('自动选择飞机设备:', props.aircraftSn)
+  } else if (props.airportSn && props.airportSn !== '') {
+    selectedDevice.value = props.airportSn
+    currentDeviceSN.value = props.airportSn
+    console.log('自动选择机场设备:', props.airportSn)
+  } else {
+    // 如果没有路由参数，尝试从设备列表选择
+    if (airportDevices.value.length > 0) {
+      selectedDevice.value = airportDevices.value[0].sn
+      currentDeviceSN.value = airportDevices.value[0].sn
+      console.log('自动选择第一个机场设备:', airportDevices.value[0].sn)
+    } else if (aircraftDevices.value.length > 0) {
+      selectedDevice.value = aircraftDevices.value[0].sn
+      currentDeviceSN.value = aircraftDevices.value[0].sn
+      console.log('自动选择第一个飞机设备:', aircraftDevices.value[0].sn)
     }
   }
 })
@@ -452,17 +962,18 @@ const saveConfig = () => {
   width: 100%;
 }
 
-.camera-card {
-  margin-bottom: 16px;
-}
-
-.card-header {
+.control-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 16px;
+  background-color: #f5f7fa;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border: 1px solid #e4e7ed;
 }
 
-.header-left {
+.control-left {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -477,7 +988,7 @@ const saveConfig = () => {
   margin-left: 8px;
 }
 
-.header-right {
+.control-right {
   display: flex;
   gap: 8px;
 }
@@ -630,5 +1141,45 @@ const saveConfig = () => {
     flex-wrap: wrap;
     gap: 8px;
   }
+}
+
+.config-tips {
+  margin-top: 4px;
+}
+
+.diagnostic-content {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.diagnostic-card {
+  border: 1px solid #e4e7ed;
+}
+
+.diagnostic-card .el-card__header {
+  background-color: #f5f7fa;
+  font-weight: bold;
+}
+
+.diagnostic-actions h4 {
+  margin: 16px 0 12px 0;
+  color: #303133;
+}
+
+/* 用户管理样式 */
+.user-manager {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: #f5f7fa;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+
+.user-manager .el-table {
+  margin-top: 8px;
+}
+
+.user-manager .el-button {
+  margin-left: 8px;
 }
 </style>

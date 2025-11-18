@@ -15,7 +15,19 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 3000,
-      open: true
+      open: true,
+      proxy: {
+        '/api': {
+          target: 'http://180.102.24.183:18080',
+          changeOrigin: true,
+          secure: false
+        },
+        '/ws': {
+          target: 'ws:/180.102.24.183:18080',
+          ws: true,
+          changeOrigin: true
+        }
+      }
     },
     build: {
       outDir: 'dist',

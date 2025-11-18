@@ -5,9 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"github.com/tencentyun/tls-sig-api-v2-golang/tencentyun"
 	"math/rand"
 	"time"
+
+	"github.com/tencentyun/tls-sig-api-v2-golang/tencentyun"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,6 +18,7 @@ type TencentLiveConfig struct {
 	SDKAppID  int64  `json:"sdk_app_id"`
 	SecretKey string `json:"secret_key"`
 	LiveURL   string `json:"live_url"`
+	TRTCAppID int64  `json:"trtc_app_id"` // TRTC应用ID
 }
 
 // LiveStreamRequest 直播流请求
@@ -28,6 +30,12 @@ type LiveStreamRequest struct {
 	FPS        int    `json:"fps"`         // 帧率
 	Quality    string `json:"quality"`     // "low", "medium", "high"
 }
+
+// LiveStreamType 直播类型常量
+const (
+	LiveStreamTypeAirport  = "airport"  // 机场直播
+	LiveStreamTypeAircraft = "aircraft" // 无人机直播
+)
 
 // LiveStreamResponse 直播流响应
 type LiveStreamResponse struct {
@@ -41,6 +49,23 @@ type LiveStreamResponse struct {
 	Error    string `json:"error,omitempty"`
 }
 
+// TRTCRoomRequest TRTC房间请求
+type TRTCRoomRequest struct {
+	DeviceSN string `json:"device_sn" binding:"required"` // 设备SN作为房间号
+	UserID   string `json:"user_id"`                      // 用户ID
+}
+
+// TRTCRoomResponse TRTC房间响应
+type TRTCRoomResponse struct {
+	Success  bool   `json:"success"`
+	RoomID   string `json:"room_id"`    // 房间号（设备SN）
+	UserID   string `json:"user_id"`    // 用户ID
+	UserSig  string `json:"user_sig"`   // 用户签名
+	SDKAppID int64  `json:"sdk_app_id"` // SDK应用ID
+	Message  string `json:"message,omitempty"`
+	Error    string `json:"error,omitempty"`
+}
+
 // TencentLiveService 腾讯云直播服务
 type TencentLiveService struct {
 	config *TencentLiveConfig
@@ -50,9 +75,10 @@ type TencentLiveService struct {
 func NewTencentLiveService() *TencentLiveService {
 	return &TencentLiveService{
 		config: &TencentLiveConfig{
-			SDKAppID:  1600093496,                                                         // 您的SDK App ID
-			SecretKey: "ba4030ba7f43d949c4d085912d2777d4f43bc5d01425b38c4dee67658d04171b", // 您的Secret Key
+			SDKAppID:  1600108347,                                                         // DJI设备使用的SDK App ID
+			SecretKey: "6f51e7f3d1f79b60ded0e71207840c79066f8a721b90ba52802ecaab45305eab", // 您的Secret Key
 			LiveURL:   "rtmp://rtmp.rtc.qq.com/push/",
+			TRTCAppID: 1600108347, // TRTC应用ID（与SDK App ID相同）
 		},
 	}
 }
@@ -60,7 +86,7 @@ func NewTencentLiveService() *TencentLiveService {
 // GenerateUserSig 生成用户签名
 func (s *TencentLiveService) GenerateUserSig(userID string) (string, error) {
 	// 使用腾讯云TLS签名API生成UserSig
-	userSig, err := tencentyun.GenUserSig(1600093496, s.config.SecretKey, userID, 86400*180) // 180天有效期
+	userSig, err := tencentyun.GenUserSig(int(s.config.SDKAppID), s.config.SecretKey, userID, 86400*180) // 180天有效期
 	if err != nil {
 		return "", fmt.Errorf("生成UserSig失败: %v", err)
 	}
@@ -86,7 +112,14 @@ func (s *TencentLiveService) GeneratePushURL(streamID string) string {
 	return fmt.Sprintf("%s%s?txSecret=%s&txTime=%s", s.config.LiveURL, streamID, signature, txTime)
 }
 
-// GeneratePlayURL 生成播放地址
+// GenerateDJIPushURL 生成DJI设备格式的推流地址
+func (s *TencentLiveService) GenerateDJIPushURL(deviceSN string, userSig string) string {
+	// DJI设备格式: rtmp://rtmp.rtc.qq.com/push/{sn}?sdkappid={sdkappid}&userid={userid}&usersig={usersig}
+	return fmt.Sprintf("%s%s?sdkappid=%d&userid=%s&usersig=%s",
+		s.config.LiveURL, deviceSN, s.config.SDKAppID, deviceSN, userSig)
+}
+
+// GeneratePlayURL 生成播放地址7870
 func (s *TencentLiveService) GeneratePlayURL(streamID string) string {
 	// 生成播放地址（这里使用腾讯云直播的播放地址格式）
 	return fmt.Sprintf("https://live.rtc.qq.com/live/%s.flv", streamID)
@@ -119,8 +152,8 @@ func (s *TencentLiveService) CreateLiveStream(req *LiveStreamRequest) (*LiveStre
 		}, nil
 	}
 
-	// 生成推流地址
-	pushURL := s.GeneratePushURL(streamID)
+	// 统一使用DJI设备格式的推流地址
+	pushURL := s.GenerateDJIPushURL(req.DeviceSN, userSig)
 
 	// 生成播放地址
 	playURL := s.GeneratePlayURL(streamID)
@@ -229,6 +262,87 @@ func StopLiveStreamHandler(c *gin.Context) {
 		})
 		return
 	}
+
+	c.JSON(200, response)
+}
+
+// CreateTRTCRoom 创建TRTC房间
+func (s *TencentLiveService) CreateTRTCRoom(req *TRTCRoomRequest) (*TRTCRoomResponse, error) {
+	// 使用设备SN作为房间号
+	roomID := req.DeviceSN
+
+	// 生成用户签名
+	userSig, err := s.GenerateUserSig(req.UserID)
+	if err != nil {
+		return &TRTCRoomResponse{
+			Success: false,
+			Error:   err.Error(),
+		}, nil
+	}
+
+	return &TRTCRoomResponse{
+		Success:  true,
+		RoomID:   roomID,
+		UserID:   req.UserID,
+		UserSig:  userSig,
+		SDKAppID: s.config.TRTCAppID,
+		Message:  "TRTC房间创建成功",
+	}, nil
+}
+
+// CreateTRTCRoomHandler 创建TRTC房间处理器
+func CreateTRTCRoomHandler(c *gin.Context) {
+	var req TRTCRoomRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{
+			"success": false,
+			"error":   "请求参数错误: " + err.Error(),
+		})
+		return
+	}
+
+	// 创建腾讯云直播服务
+	service := NewTencentLiveService()
+
+	// 创建TRTC房间
+	response, err := service.CreateTRTCRoom(&req)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"success": false,
+			"error":   "创建TRTC房间失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(200, response)
+}
+
+// JoinTRTCRoomHandler 加入TRTC房间处理器
+func JoinTRTCRoomHandler(c *gin.Context) {
+	var req TRTCRoomRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{
+			"success": false,
+			"error":   "请求参数错误: " + err.Error(),
+		})
+		return
+	}
+
+	// 创建腾讯云直播服务
+	service := NewTencentLiveService()
+
+	// 加入TRTC房间
+	response, err := service.CreateTRTCRoom(&req) // 使用相同的逻辑，因为都是生成用户签名
+	if err != nil {
+		c.JSON(500, gin.H{
+			"success": false,
+			"error":   "加入TRTC房间失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 修改消息为加入房间
+	response.Message = "用户已加入TRTC房间"
 
 	c.JSON(200, response)
 }

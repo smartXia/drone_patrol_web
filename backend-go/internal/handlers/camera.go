@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"drone-patrol-backend/internal/services"
@@ -253,5 +254,69 @@ func (h *Handlers) StopCameraStream(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"code":    0,
 		"message": "摄像头流停止成功",
+	})
+}
+
+// CreateLiveStream 创建腾讯云直播流
+func (h *Handlers) CreateLiveStream(c *gin.Context) {
+	// 调用腾讯云直播服务
+	services.CreateLiveStreamHandler(c)
+}
+
+// GetLiveStreamStatus 获取直播流状态
+func (h *Handlers) GetLiveStreamStatus(c *gin.Context) {
+	// 调用腾讯云直播服务
+	services.GetLiveStreamStatusHandler(c)
+}
+
+// StopLiveStream 停止直播流
+func (h *Handlers) StopLiveStream(c *gin.Context) {
+	// 调用腾讯云直播服务
+	services.StopLiveStreamHandler(c)
+}
+
+// CreateTRTCRoom 创建TRTC房间
+func (h *Handlers) CreateTRTCRoom(c *gin.Context) {
+	// 调用腾讯云TRTC服务
+	services.CreateTRTCRoomHandler(c)
+}
+
+// JoinTRTCRoom 加入TRTC房间
+func (h *Handlers) JoinTRTCRoom(c *gin.Context) {
+	// 调用腾讯云TRTC服务
+	services.JoinTRTCRoomHandler(c)
+}
+
+// WhipStream WHIP推流处理
+func (h *Handlers) WhipStream(c *gin.Context) {
+	// 创建WHIP服务实例并处理请求
+	whipService := services.NewWhipService()
+	whipService.WhipHandler(c)
+}
+
+// GetWhipAuth 获取WHIP认证信息
+func (h *Handlers) GetWhipAuth(c *gin.Context) {
+	room := c.Param("room")
+	if room == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Room parameter is required",
+		})
+		return
+	}
+
+	// 创建WHIP服务实例
+	whipService := services.NewWhipService()
+
+	// 生成认证信息
+	authToken := whipService.GenerateAuthToken(room)
+	txSecret := whipService.GenerateTxSecret(room)
+	txTime := whipService.GenerateTxTime()
+
+	c.JSON(http.StatusOK, gin.H{
+		"room":      room,
+		"authToken": authToken,
+		"txSecret":  txSecret,
+		"txTime":    txTime,
+		"whipUrl":   fmt.Sprintf("/api/whip/stream?room=%s&tx_secret=%s&tx_time=%s", room, txSecret, txTime),
 	})
 }
